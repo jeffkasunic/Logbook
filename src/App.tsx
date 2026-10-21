@@ -40,7 +40,8 @@ function readTab(): Tab {
 
 export default function App() {
   const { state, quarter, dispatch, saveStatus, retrySave, guest } = useStore();
-  const [tab, setTab] = useState<Tab>(readTab);
+  // Guests always start on the Daily log; only signed-in users get their last tab back.
+  const [tab, setTab] = useState<Tab>(() => (guest ? 'log' : readTab()));
   const [today, setToday] = useState(todayISO);
   const [selected, setSelected] = useState(() => (inQuarter(quarter, today) ? today : quarter.startDate));
   const [guestTipClosed, setGuestTipClosed] = useState(readGuestTipClosed);
@@ -61,12 +62,13 @@ export default function App() {
   }, []);
 
   useEffect(() => {
+    if (guest) return;
     try {
       localStorage.setItem(TAB_KEY, tab);
     } catch {
       /* ignore */
     }
-  }, [tab]);
+  }, [tab, guest]);
 
   // When switching quarters, move the selected day into that quarter.
   useEffect(() => {
