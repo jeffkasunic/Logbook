@@ -14,6 +14,16 @@ const db = DynamoDBDocumentClient.from(new DynamoDBClient({}), {
 const QUARTER_ID = /^\d{4}-Q[1-4]$/;
 const ISO_DATE = /^\d{4}-\d{2}-\d{2}$/;
 
+// Size limits, so one request can't turn into thousands of DynamoDB writes. Generous for a real log: a quarter of
+// daily entries is well under 100 KB, and 40 quarters is ten years.
+const MAX_BODY_BYTES = 64 * 1024;
+const MAX_IMPORT_BYTES = 2 * 1024 * 1024;
+const MAX_QUARTERS = 40;
+/** A quarter is 13 weeks, or 14 for Q4 of a 53-week year. */
+const MAX_QUARTER_DAYS = 14 * 7;
+/** Most categories or metrics one day can record. */
+const MAX_RECORD_KEYS = 50;
+
 class HttpError extends Error {
   constructor(status, message) {
     super(message);
@@ -50,7 +60,7 @@ export async function handler(event) {
         await putDay(userID, checkQuarterId(p.quarterId), checkDate(p.date), parseBody(event));
         return json(204);
       case 'POST /import':
-        await importState(userID, parseBody(event));
+        await importState(userID, parseBody(event, MAX_IMPORT_BYTES));
         return json(204);
       default:
         throw new HttpError(404, 'not found');
@@ -115,7 +125,7 @@ function stateItem(userID, body) {
 
 function quarterItem(userID, quarterId, body) {
   if (!isObject(body) || body.id !== quarterId) throw new HttpError(400, 'quarter id must match the path');
-  if (typeof body.startDate !== 'string' || !Array.isArray(body.categories)) throw new HttpError(400, 'invalid quarter');
+  if (!checkISODate(body.startDate) || !Array.isArray(body.categories)) throw new HttpError(400, 'invalid quarter');
   // Days are stored as their own items; userID and sk always come from the server.
   const { days: _days, userID: _u, sk: _sk, ...fields } = body;
   return { ...fields, userID, sk: `Q#${quarterId}` };
@@ -152,12 +162,18 @@ async function importState(userID, body) {
   if (!isObject(body) || body.version !== 1 || !Array.isArray(body.quarters) || !body.quarters.length) {
     throw new HttpError(400, 'invalid state');
   }
+  if (body.quarters.length > MAX_QUARTERS) throw new HttpError(400, `at most ${MAX_QUARTERS} quarters`);
   const items = [stateItem(userID, body)];
+  const seen = new Set();
   for (const q of body.quarters) {
     const quarterId = checkQuarterId(q?.id);
+    if (seen.has(quarterId)) throw new HttpError(400, 'duplicate quarter');
+    seen.add(quarterId);
     items.push(quarterItem(userID, quarterId, q));
     for (const [date, day] of Object.entries(q.days ?? {})) {
-      items.push(dayItem(userID, quarterId, checkDate(date), day));
+      const offset = daysBetween(q.startDate, checkDate(date));
+      if (!(offset >= 0 && offset < MAX_QUARTER_DAYS)) throw new HttpError(400, `day ${date} is outside quarter ${quarterId}`);
+      items.push(dayItem(userID, quarterId, date, day));
     }
   }
   const existing = await queryAll(userID);
@@ -181,10 +197,11 @@ async function batchWrite(requests) {
 
 // ---------- validation ----------
 
-function parseBody(event) {
+function parseBody(event, maxBytes = MAX_BODY_BYTES) {
   if (!event.body) throw new HttpError(400, 'body required');
+  const text = event.isBase64Encoded ? Buffer.from(event.body, 'base64').toString('utf8') : event.body;
+  if (Buffer.byteLength(text) > maxBytes) throw new HttpError(413, 'body too large');
   try {
-    const text = event.isBase64Encoded ? Buffer.from(event.body, 'base64').toString('utf8') : event.body;
     return JSON.parse(text);
   } catch {
     throw new HttpError(400, 'body must be JSON');
@@ -197,15 +214,24 @@ function checkQuarterId(id) {
 }
 
 function checkDate(date) {
-  if (typeof date !== 'string' || !ISO_DATE.test(date)) throw new HttpError(400, 'invalid date');
+  if (!checkISODate(date)) throw new HttpError(400, 'invalid date');
   return date;
 }
+
+/** A real YYYY-MM-DD date, not just the right shape (so no 2026-13-45). */
+function checkISODate(date) {
+  if (typeof date !== 'string' || !ISO_DATE.test(date)) return false;
+  const d = new Date(`${date}T00:00:00Z`);
+  return !Number.isNaN(d.getTime()) && d.toISOString().startsWith(date);
+}
+
+const daysBetween = (a, b) => Math.round((Date.parse(`${b}T00:00:00Z`) - Date.parse(`${a}T00:00:00Z`)) / 86_400_000);
 
 const isObject = (v) => typeof v === 'object' && v !== null && !Array.isArray(v);
 
 function numberRecord(rec) {
   if (rec == null) return undefined;
-  if (!isObject(rec) || !Object.values(rec).every((n) => typeof n === 'number')) {
+  if (!isObject(rec) || Object.keys(rec).length > MAX_RECORD_KEYS || !Object.values(rec).every((n) => Number.isFinite(n))) {
     throw new HttpError(400, 'hours and metrics must map ids to numbers');
   }
   return Object.keys(rec).length ? rec : undefined;
