@@ -1,11 +1,15 @@
 # Logbook
 
-A React + TypeScript web app version of the original Logbook spreadsheet: a daily time log by
-category, weekly goals, and a quarterly plan.
+A daily time log by category, weekly goals, and a quarterly plan. It's a multi-user web app
+built with React + TypeScript: anyone can sign up, and each account keeps its own private log
+on AWS.
 
 **Try it:** https://jeffkasunic.com/logbook
 
-New users start with an empty current quarter; **Settings → Load sample data** fills it with made-up examples.
+No account needed: **Try it as a guest** opens the app with sample data. Guest data stays in
+the browser tab and is gone when you close it.
+
+New accounts start with an empty current quarter; **Settings → Load sample data** fills it with made-up examples.
 
 ## Run it
 
