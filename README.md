@@ -58,3 +58,9 @@ AWS services used:
 - **Amazon DynamoDB:** one table, `logbook`, partitioned by user ID. Each quarter
   and each day is its own item, so an edit saves only what changed.
 
+## Screenshots
+
+![Quarter view: weekly hours per category against goals, a daily heatmap, and hours per week](assets/Logbook_01.jpg)
+
+![Daily log: hours per category for each day, grouped by week, with percent of daily goal](assets/Logbook_02.jpg)
+
