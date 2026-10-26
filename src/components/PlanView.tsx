@@ -38,6 +38,17 @@ export function PlanView({ onEdit }: { onEdit: () => void }) {
     });
   const stepBook = (id: string) => patch({ reading: q.reading.map((r) => (r.id === id ? { ...r, status: NEXT_STATUS[r.status] } : r)) });
 
+  const removeProject = (id: string) => patch({ projects: q.projects.filter((p) => p.id !== id) });
+  const removeGoal = (area: number, k: number, item: string) =>
+    patch({
+      yearGoals: q.yearGoals.map((g, i) =>
+        i !== area ? g : { ...g, items: g.items.filter((_, j) => j !== k), done: g.done?.filter((x) => x !== item), indented: g.indented?.filter((x) => x !== item) },
+      ),
+    });
+  const removeItem = (sectionId: string, itemId: string) =>
+    patch({ sections: q.sections?.map((sec) => (sec.id !== sectionId ? sec : { ...sec, items: sec.items.filter((it) => it.id !== itemId) })) });
+  const removeBook = (id: string) => patch({ reading: q.reading.filter((r) => r.id !== id) });
+
   return (
     <div className="plan">
       <section className="panel plan-core">
@@ -64,7 +75,7 @@ export function PlanView({ onEdit }: { onEdit: () => void }) {
             g.items.length > 0 && (
               <PlanGroup key={`${i}-${g.title}`} title={g.title}>
                 {g.items.map((it, k) => (
-                  <CheckItem key={`${k}-${it}`} label={it} checked={!!g.done?.includes(it)} indent={g.indented?.includes(it)} onChange={(v) => toggleGoal(i, it, v)} />
+                  <CheckItem key={`${k}-${it}`} label={it} checked={!!g.done?.includes(it)} indent={g.indented?.includes(it)} onChange={(v) => toggleGoal(i, it, v)} onRemove={() => removeGoal(i, k, it)} />
                 ))}
               </PlanGroup>
             ),
@@ -75,7 +86,7 @@ export function PlanView({ onEdit }: { onEdit: () => void }) {
         {projectGroups.map((g) => (
           <PlanGroup key={g.key} title={g.title} color={g.color}>
             {g.items.map((p) => (
-              <CheckItem key={p.id} label={p.text} checked={p.done} indent={p.indent} onChange={(v) => toggleProject(p.id, v)} />
+              <CheckItem key={p.id} label={p.text} checked={p.done} indent={p.indent} onChange={(v) => toggleProject(p.id, v)} onRemove={() => removeProject(p.id)} />
             ))}
           </PlanGroup>
         ))}
@@ -88,7 +99,7 @@ export function PlanView({ onEdit }: { onEdit: () => void }) {
             books.length > 0 && (
               <PlanGroup key={g.key} title={g.title}>
                 {books.map((r) => (
-                  <BookItem key={r.id} book={r} onStep={() => stepBook(r.id)} />
+                  <BookItem key={r.id} book={r} onStep={() => stepBook(r.id)} onRemove={() => removeBook(r.id)} />
                 ))}
               </PlanGroup>
             )
@@ -100,7 +111,7 @@ export function PlanView({ onEdit }: { onEdit: () => void }) {
         <PlanPanel key={sec.id} title={sec.title} done={sec.items.filter((x) => x.done).length} total={sec.items.length} empty="Nothing here yet." onEdit={onEdit}>
           <ul className="checklist plan-list">
             {sec.items.map((it) => (
-              <CheckItem key={it.id} label={it.text} checked={it.done} onChange={(v) => toggleItem(sec.id, it.id, v)} />
+              <CheckItem key={it.id} label={it.text} checked={it.done} indent={it.indent} onChange={(v) => toggleItem(sec.id, it.id, v)} onRemove={() => removeItem(sec.id, it.id)} />
             ))}
           </ul>
         </PlanPanel>
@@ -148,7 +159,7 @@ function PlanGroup({ title, color, children }: { title: string; color?: string; 
 }
 
 /** A book with its status pill; clicking the pill steps To read → Reading → Read. */
-function BookItem({ book: r, onStep }: { book: ReadingItem; onStep: () => void }) {
+function BookItem({ book: r, onStep, onRemove }: { book: ReadingItem; onStep: () => void; onRemove: () => void }) {
   return (
     <li className={r.status === 'done' ? 'is-done' : undefined}>
       <div className="plan-item">
@@ -160,11 +171,12 @@ function BookItem({ book: r, onStep }: { book: ReadingItem; onStep: () => void }
           {r.note && <span className="plan-note">{r.note}</span>}
         </span>
       </div>
+      <RemoveButton label={r.title} onClick={onRemove} />
     </li>
   );
 }
 
-function CheckItem({ label, note, checked, indent, onChange }: { label: string; note?: string; checked: boolean; indent?: boolean; onChange: (v: boolean) => void }) {
+function CheckItem({ label, note, checked, indent, onChange, onRemove }: { label: string; note?: string; checked: boolean; indent?: boolean; onChange: (v: boolean) => void; onRemove: () => void }) {
   return (
     <li className={[checked && 'is-done', indent && 'is-indented'].filter(Boolean).join(' ') || undefined}>
       <label className="plan-item">
@@ -174,6 +186,16 @@ function CheckItem({ label, note, checked, indent, onChange }: { label: string; 
           {note && <span className="plan-note">{note}</span>}
         </span>
       </label>
+      <RemoveButton label={label} onClick={onRemove} />
     </li>
+  );
+}
+
+/** Deletes the item outright (same as × on the Edit tab). Shown on hover or focus where there's a pointer, always on touch. */
+function RemoveButton({ label, onClick }: { label: string; onClick: () => void }) {
+  return (
+    <button type="button" className="btn btn-icon btn-quiet plan-remove" aria-label={`Remove “${label}”`} title="Remove" onClick={onClick}>
+      ×
+    </button>
   );
 }

@@ -416,7 +416,7 @@ export function CustomSections({ sections, onChange }: { sections: PlanSection[]
             onReorder={(items) => set(sec.id, { items })}
             itemKey={(it) => it.id}
             itemLabel={(it) => it.text}
-            itemClass={(it) => (it.done ? 'is-done' : undefined)}
+            itemClass={(it) => [it.done && 'is-done', it.indent && 'is-indented'].filter(Boolean).join(' ') || undefined}
             renderItem={(it) => (
               <>
                 <input
@@ -429,6 +429,16 @@ export function CustomSections({ sections, onChange }: { sections: PlanSection[]
                     set(sec.id, { items: v ? sec.items.map((x) => (x.id === it.id ? { ...x, text: v } : x)) : sec.items.filter((x) => x.id !== it.id) });
                   }}
                 />
+                <button
+                  type="button"
+                  className="btn btn-icon btn-quiet"
+                  aria-label={it.indent ? `Outdent “${it.text}”` : `Indent “${it.text}”`}
+                  title={it.indent ? 'Outdent' : 'Indent'}
+                  aria-pressed={!!it.indent}
+                  onClick={() => set(sec.id, { items: sec.items.map((x) => (x.id === it.id ? { ...x, indent: !it.indent || undefined } : x)) })}
+                >
+                  {it.indent ? '←' : '→'}
+                </button>
                 <button type="button" className="btn btn-icon btn-quiet" aria-label={`Remove “${it.text}”`} onClick={() => set(sec.id, { items: sec.items.filter((x) => x.id !== it.id) })}>
                   ×
                 </button>
