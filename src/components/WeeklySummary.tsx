@@ -4,6 +4,7 @@ import { heatStep, seriesVar } from '../lib/colors';
 import { quarterWeeks, weekIndexOf, weekRange } from '../lib/dates';
 import { NumCell } from './NumCell';
 import { WeeklyChart } from './WeeklyChart';
+import { Linkify } from './Linkify';
 import { QuarterStrip } from './QuarterStrip';
 
 /** The weekly sheet: each category's hours per week against its weekly goal. */
@@ -60,7 +61,11 @@ export function WeeklySummary({ today, onOpenDay }: { today: string; onOpenDay: 
                     <th scope="row" className="col-name">
                       <span className="th-swatch" style={{ background: seriesVar(i) }} aria-hidden />
                       {c.name}
-                      {c.note && <span className="weekly-note">{c.note}</span>}
+                      {c.note && (
+                        <span className="weekly-note">
+                          <Linkify text={c.note} />
+                        </span>
+                      )}
                     </th>
                     <td className="col-goal">
                       <NumCell

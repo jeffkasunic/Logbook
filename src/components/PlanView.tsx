@@ -1,8 +1,9 @@
-import type { ReactNode } from 'react';
+import { useRef, useState, type ReactNode } from 'react';
 import { useStore } from '../store';
 import type { Quarter, ReadingItem } from '../types';
 import { seriesVar } from '../lib/colors';
 import { NEXT_STATUS, readingCategories, STATUS_LABEL } from '../lib/reading';
+import { Linkify } from './Linkify';
 
 /** The quarter's core focus, then its year goals, projects, reading list and the user's own sections as checklists. Edit the lists themselves on the Edit tab. */
 export function PlanView({ onEdit }: { onEdit: () => void }) {
@@ -36,6 +37,11 @@ export function PlanView({ onEdit }: { onEdit: () => void }) {
     patch({
       sections: q.sections?.map((sec) => (sec.id !== sectionId ? sec : { ...sec, items: sec.items.map((it) => (it.id === itemId ? { ...it, done } : it)) })),
     });
+  const setItemNote = (sectionId: string, itemId: string, note: string) =>
+    patch({
+      sections: q.sections?.map((sec) => (sec.id !== sectionId ? sec : { ...sec, items: sec.items.map((it) => (it.id === itemId ? { ...it, note: note || undefined } : it)) })),
+    });
+  const setBookNote = (id: string, note: string) => patch({ reading: q.reading.map((r) => (r.id === id ? { ...r, note: note || undefined } : r)) });
   const stepBook = (id: string) => patch({ reading: q.reading.map((r) => (r.id === id ? { ...r, status: NEXT_STATUS[r.status] } : r)) });
 
   const removeProject = (id: string) => patch({ projects: q.projects.filter((p) => p.id !== id) });
@@ -99,7 +105,7 @@ export function PlanView({ onEdit }: { onEdit: () => void }) {
             books.length > 0 && (
               <PlanGroup key={g.key} title={g.title}>
                 {books.map((r) => (
-                  <BookItem key={r.id} book={r} onStep={() => stepBook(r.id)} onRemove={() => removeBook(r.id)} />
+                  <BookItem key={r.id} book={r} onStep={() => stepBook(r.id)} onNoteChange={(n) => setBookNote(r.id, n)} onRemove={() => removeBook(r.id)} />
                 ))}
               </PlanGroup>
             )
@@ -111,7 +117,7 @@ export function PlanView({ onEdit }: { onEdit: () => void }) {
         <PlanPanel key={sec.id} title={sec.title} done={sec.items.filter((x) => x.done).length} total={sec.items.length} empty="Nothing here yet." onEdit={onEdit}>
           <ul className="checklist plan-list">
             {sec.items.map((it) => (
-              <CheckItem key={it.id} label={it.text} checked={it.done} indent={it.indent} onChange={(v) => toggleItem(sec.id, it.id, v)} onRemove={() => removeItem(sec.id, it.id)} />
+              <CheckItem key={it.id} label={it.text} note={it.note} checked={it.done} indent={it.indent} onChange={(v) => toggleItem(sec.id, it.id, v)} onNoteChange={(n) => setItemNote(sec.id, it.id, n)} onRemove={() => removeItem(sec.id, it.id)} />
             ))}
           </ul>
         </PlanPanel>
@@ -159,7 +165,8 @@ function PlanGroup({ title, color, children }: { title: string; color?: string; 
 }
 
 /** A book with its status pill; clicking the pill steps To read → Reading → Read. */
-function BookItem({ book: r, onStep, onRemove }: { book: ReadingItem; onStep: () => void; onRemove: () => void }) {
+function BookItem({ book: r, onStep, onNoteChange, onRemove }: { book: ReadingItem; onStep: () => void; onNoteChange: (note: string) => void; onRemove: () => void }) {
+  const [editing, setEditing] = useState(false);
   return (
     <li className={r.status === 'done' ? 'is-done' : undefined}>
       <div className="plan-item">
@@ -168,26 +175,87 @@ function BookItem({ book: r, onStep, onRemove }: { book: ReadingItem; onStep: ()
         </button>
         <span className="plan-item-text">
           {r.title}
-          {r.note && <span className="plan-note">{r.note}</span>}
+          <PlanNote note={r.note} label={r.title} editing={editing} onSave={onNoteChange} onDone={() => setEditing(false)} />
         </span>
       </div>
+      <NoteButton label={r.title} hasNote={!!r.note} onClick={() => setEditing(true)} />
       <RemoveButton label={r.title} onClick={onRemove} />
     </li>
   );
 }
 
-function CheckItem({ label, note, checked, indent, onChange, onRemove }: { label: string; note?: string; checked: boolean; indent?: boolean; onChange: (v: boolean) => void; onRemove: () => void }) {
+function CheckItem({
+  label,
+  note,
+  checked,
+  indent,
+  onChange,
+  onNoteChange,
+  onRemove,
+}: {
+  label: string;
+  note?: string;
+  checked: boolean;
+  indent?: boolean;
+  onChange: (v: boolean) => void;
+  /** Set to let the note be added or edited here; otherwise the note only shows. */
+  onNoteChange?: (note: string) => void;
+  onRemove: () => void;
+}) {
+  const [editing, setEditing] = useState(false);
   return (
     <li className={[checked && 'is-done', indent && 'is-indented'].filter(Boolean).join(' ') || undefined}>
       <label className="plan-item">
         <input type="checkbox" checked={checked} onChange={(e) => onChange(e.target.checked)} />
         <span className="plan-item-text">
           {label}
-          {note && <span className="plan-note">{note}</span>}
+          <PlanNote note={note} label={label} editing={editing} onSave={onNoteChange} onDone={() => setEditing(false)} />
         </span>
       </label>
+      {onNoteChange && <NoteButton label={label} hasNote={!!note} onClick={() => setEditing(true)} />}
       <RemoveButton label={label} onClick={onRemove} />
     </li>
+  );
+}
+
+/** An item's note with its links, or a box to edit it. Enter or leaving the box saves; Esc cancels. */
+function PlanNote({ note, label, editing, onSave, onDone }: { note?: string; label: string; editing: boolean; onSave?: (note: string) => void; onDone: () => void }) {
+  const cancelled = useRef(false);
+  if (editing && onSave)
+    return (
+      <input
+        className="line-input plan-note-input"
+        defaultValue={note ?? ''}
+        placeholder="Note"
+        aria-label={`Note on ${label}`}
+        autoFocus
+        onFocus={() => (cancelled.current = false)}
+        onKeyDown={(e) => {
+          if (e.key === 'Enter') e.currentTarget.blur();
+          else if (e.key === 'Escape') {
+            cancelled.current = true;
+            e.currentTarget.blur();
+          }
+        }}
+        onBlur={(e) => {
+          const v = e.target.value.trim();
+          if (!cancelled.current && v !== (note ?? '')) onSave(v);
+          onDone();
+        }}
+      />
+    );
+  return note ? (
+    <span className="plan-note">
+      <Linkify text={note} />
+    </span>
+  ) : null;
+}
+
+function NoteButton({ label, hasNote, onClick }: { label: string; hasNote: boolean; onClick: () => void }) {
+  return (
+    <button type="button" className="btn btn-icon btn-quiet plan-note-btn" aria-label={`${hasNote ? 'Edit' : 'Add'} note on “${label}”`} title={hasNote ? 'Edit note' : 'Add note'} onClick={onClick}>
+      ✎
+    </button>
   );
 }
 

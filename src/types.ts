@@ -56,7 +56,7 @@ export interface PlanSection {
   id: string;
   title: string;
   /** `indent` shows the item one step in, under the one above. */
-  items: { id: string; text: string; done: boolean; indent?: boolean }[];
+  items: { id: string; text: string; note?: string; done: boolean; indent?: boolean }[];
 }
 
 export interface GoalArea {

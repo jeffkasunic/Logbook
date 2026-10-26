@@ -411,7 +411,7 @@ export function CustomSections({ sections, onChange }: { sections: PlanSection[]
             </span>
           </div>
           <SortableList
-            className="checklist"
+            className="checklist custom-items"
             items={sec.items}
             onReorder={(items) => set(sec.id, { items })}
             itemKey={(it) => it.id}
@@ -419,16 +419,28 @@ export function CustomSections({ sections, onChange }: { sections: PlanSection[]
             itemClass={(it) => [it.done && 'is-done', it.indent && 'is-indented'].filter(Boolean).join(' ') || undefined}
             renderItem={(it) => (
               <>
-                <input
-                  className="line-input"
-                  defaultValue={it.text}
-                  aria-label={`${sec.title} item`}
-                  onBlur={(e) => {
-                    const v = e.target.value.trim();
-                    if (v === it.text) return;
-                    set(sec.id, { items: v ? sec.items.map((x) => (x.id === it.id ? { ...x, text: v } : x)) : sec.items.filter((x) => x.id !== it.id) });
-                  }}
-                />
+                <div className="custom-item-text">
+                  <input
+                    className="line-input"
+                    defaultValue={it.text}
+                    aria-label={`${sec.title} item`}
+                    onBlur={(e) => {
+                      const v = e.target.value.trim();
+                      if (v === it.text) return;
+                      set(sec.id, { items: v ? sec.items.map((x) => (x.id === it.id ? { ...x, text: v } : x)) : sec.items.filter((x) => x.id !== it.id) });
+                    }}
+                  />
+                  <input
+                    className="line-input custom-item-note"
+                    defaultValue={it.note ?? ''}
+                    placeholder="Note"
+                    aria-label={`Note on ${it.text}`}
+                    onBlur={(e) => {
+                      const v = e.target.value.trim();
+                      if (v !== (it.note ?? '')) set(sec.id, { items: sec.items.map((x) => (x.id === it.id ? { ...x, note: v || undefined } : x)) });
+                    }}
+                  />
+                </div>
                 <button
                   type="button"
                   className="btn btn-icon btn-quiet"
