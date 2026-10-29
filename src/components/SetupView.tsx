@@ -7,6 +7,7 @@ import { Grip } from './Sortable';
 import { useDragReorder } from '../lib/useDragReorder';
 import { useMasonry } from '../lib/useMasonry';
 import { readingCategories } from '../lib/reading';
+import { confirmRemoveProject } from '../lib/projects';
 import { CustomSections, Projects, Reading, TextLines, YearGoals } from './PlanSections';
 
 const slug = (s: string) =>
@@ -262,7 +263,7 @@ export function SetupView() {
                 {q.projects.filter((p) => p.done).length}/{q.projects.length} done
               </span>
             </h2>
-            <Projects projects={q.projects} categories={q.categories} onChange={(projects) => patch({ projects })} />
+            <Projects projects={q.projects} categories={q.categories} onChange={(projects) => patch({ projects })} confirmRemove={(p) => confirmRemoveProject(state, q.id, p)} />
           </section>
 
           <section className="panel">

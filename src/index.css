@@ -350,6 +350,7 @@ h2 {
 .tab {
   height: 36px;
   padding: 0 0.9rem;
+  white-space: nowrap;
   border: 0;
   border-bottom: 2px solid transparent;
   background: transparent;
@@ -1146,6 +1147,7 @@ div.plan-item {
   min-width: 0;
 }
 .plan-note-btn,
+.plan-open-btn,
 .plan-remove {
   flex: none;
 }
@@ -1154,6 +1156,7 @@ div.plan-item {
 }
 @media (hover: hover) {
   .plan-note-btn,
+  .plan-open-btn,
   .plan-remove,
   .plan h2 > .grip {
     opacity: 0;
@@ -1163,6 +1166,8 @@ div.plan-item {
   .plan-list li:hover .plan-note-btn,
   .plan-core-lines li:hover .plan-note-btn,
   .plan-list li:hover .plan-remove,
+  .plan-list li:hover .plan-open-btn,
+  .plan-open-btn:focus-visible,
   .plan-note-btn:focus-visible,
   .plan-remove:focus-visible {
     opacity: 1;
@@ -1201,6 +1206,148 @@ div.plan-item {
   font: inherit;
   text-decoration: underline;
   cursor: pointer;
+}
+
+/* ------------------------------------------------------------------ projects (one project's page) */
+.projects {
+  display: grid;
+  grid-template-columns: minmax(220px, 300px) minmax(0, 1fr);
+  gap: 1.25rem;
+  align-items: start;
+}
+.projects-nav-list {
+  list-style: none;
+  margin: 0.2rem 0 0;
+  padding: 0;
+}
+.projects-nav-btn {
+  display: flex;
+  align-items: baseline;
+  gap: 0.45rem;
+  width: 100%;
+  padding: 0.35rem 0.5rem;
+  border: 0;
+  border-radius: var(--radius-sm);
+  background: transparent;
+  font-size: 0.92rem;
+  line-height: 1.3;
+  text-align: left;
+  cursor: pointer;
+}
+.projects-nav-btn:hover {
+  background: var(--surface-2);
+}
+.projects-nav-btn.is-active {
+  background: var(--accent-soft);
+  font-weight: 600;
+}
+.projects-nav-btn.is-done .projects-nav-text,
+.project-page-title .is-done {
+  color: var(--muted);
+  text-decoration: line-through;
+}
+.projects-nav-text {
+  flex: 1;
+  min-width: 0;
+}
+.project-page-title {
+  flex-wrap: wrap;
+  font-size: 1.5rem;
+}
+.project-page-title .count {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.35rem;
+}
+.project-page > .plan-note {
+  margin: -0.4rem 0 0.9rem;
+  font-size: 0.88rem;
+}
+.project-text + .project-text {
+  margin-top: 1.25rem;
+}
+.project-tasks {
+  margin: 0.15rem 0 0;
+}
+.project-tasks .line-input {
+  flex: 1;
+}
+.project-tasks .is-done .line-input {
+  color: var(--muted);
+  text-decoration: line-through;
+}
+@media (hover: hover) {
+  .project-task-btn {
+    opacity: 0;
+  }
+  .project-tasks li:hover .project-task-btn,
+  .project-task-btn:focus-visible {
+    opacity: 1;
+  }
+}
+.project-notes-add {
+  min-width: 28px;
+  margin-left: auto;
+  font-size: 1.05rem;
+  line-height: 1;
+}
+.project-notes {
+  list-style: none;
+  margin: 0.5rem 0 0;
+  padding: 0;
+}
+.project-note {
+  padding: 1.1rem 0;
+  border-top: 1px solid var(--rule);
+}
+.project-text-row {
+  display: flex;
+  align-items: flex-start;
+  gap: 0.5rem;
+}
+.project-text-row > :first-child {
+  flex: 1;
+  min-width: 0;
+}
+.project-text-actions {
+  flex: none;
+}
+@media (hover: hover) {
+  .project-text-actions {
+    opacity: 0;
+  }
+  .project-note:hover .project-text-actions,
+  .project-text-actions:focus-within {
+    opacity: 1;
+  }
+}
+.project-text-body {
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+  line-height: 1.55;
+  cursor: text;
+}
+.project-textarea {
+  display: block;
+  width: 100%;
+  padding: 0.5rem 0.6rem;
+  border: 1px solid var(--accent);
+  border-radius: var(--radius-sm);
+  background: var(--surface);
+  color: var(--ink);
+  font: inherit;
+  line-height: 1.55;
+  resize: vertical;
+}
+.project-textarea:focus {
+  outline: none;
+}
+.project-text-add {
+  display: flex;
+  justify-content: flex-end;
+}
+.project-description .project-text-body {
+  color: var(--ink-2);
 }
 
 /* ------------------------------------------------------------------ planning sections (on the setup tab) */
@@ -1672,7 +1819,8 @@ div.plan-item {
     padding-left: 16px;
     padding-right: 16px;
   }
-  .setup {
+  .setup,
+  .projects {
     grid-template-columns: 1fr;
   }
   .stats {

@@ -156,5 +156,28 @@ export function sampleState(): AppState {
 
   fillDays(q, today, 7);
 
-  return { version: 1, quarters: [...pastQuarters(today), q], activeQuarterId: q.id };
+  return {
+    version: 1,
+    quarters: [...pastQuarters(today), q],
+    activeQuarterId: q.id,
+    projectDetails: {
+      's-p2': {
+        description: 'Take one finished story through a full revision and send it out to at least three magazines.',
+        tasks: [
+          { id: 's-t1', text: 'Pick the story', done: true },
+          { id: 's-t2', text: 'Second draft', done: true },
+          { id: 's-t3', text: 'Get feedback from the writing group', done: false },
+          { id: 's-t4', text: 'Final pass and submit', done: false },
+        ],
+        notes: [
+          {
+            id: 's-n1',
+            date: q.startDate,
+            text: 'Candidate: “The Lighthouse Keeper”.\n\n- Read it aloud before sending\n- Submission calls: www.example.com/calls',
+          },
+          { id: 's-n2', date: addDays(today, -2), text: 'Cut the opening scene and started at the storm. Reads much faster now.' },
+        ],
+      },
+    },
+  };
 }

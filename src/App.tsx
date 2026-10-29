@@ -6,13 +6,15 @@ import { DailyLog } from './components/DailyLog';
 import { WeeklySummary } from './components/WeeklySummary';
 import { SetupView } from './components/SetupView';
 import { PlanView } from './components/PlanView';
+import { ProjectsView } from './components/ProjectsView';
 import { SettingsView } from './components/SettingsView';
 
-type Tab = 'log' | 'weeks' | 'plan' | 'setup' | 'settings';
+type Tab = 'log' | 'weeks' | 'plan' | 'projects' | 'setup' | 'settings';
 const TABS: { id: Tab; label: string }[] = [
   { id: 'log', label: 'Daily log' },
   { id: 'weeks', label: 'Quarter' },
   { id: 'plan', label: 'Plan' },
+  { id: 'projects', label: 'Projects' },
   { id: 'setup', label: 'Edit' },
   { id: 'settings', label: 'Settings' },
 ];
@@ -45,6 +47,7 @@ export default function App() {
   const [today, setToday] = useState(todayISO);
   const [selected, setSelected] = useState(() => (inQuarter(quarter, today) ? today : quarter.startDate));
   const [guestTipClosed, setGuestTipClosed] = useState(readGuestTipClosed);
+  const [projectId, setProjectId] = useState<string | null>(null);
 
   function closeGuestTip() {
     setGuestTipClosed(true);
@@ -174,7 +177,7 @@ export default function App() {
             to see it filled in.
           </p>
         )}
-        {(tab === 'log' || tab === 'weeks' || tab === 'plan') && (
+        {(tab === 'log' || tab === 'weeks' || tab === 'plan' || tab === 'projects') && (
           <h2 className="page-title">
             {TABS.find((t) => t.id === tab)?.label}{' '}
             <span className="count">
@@ -192,7 +195,16 @@ export default function App() {
             }}
           />
         )}
-        {tab === 'plan' && <PlanView onEdit={() => setTab('setup')} />}
+        {tab === 'plan' && (
+          <PlanView
+            onEdit={() => setTab('setup')}
+            onOpenProject={(id) => {
+              setProjectId(id);
+              setTab('projects');
+            }}
+          />
+        )}
+        {tab === 'projects' && <ProjectsView selected={projectId} onSelect={setProjectId} onEdit={() => setTab('setup')} />}
         {tab === 'setup' && <SetupView />}
         {tab === 'settings' && <SettingsView />}
       </main>

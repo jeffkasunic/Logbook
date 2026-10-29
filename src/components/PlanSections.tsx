@@ -88,8 +88,20 @@ function AddInput({ placeholder, onAdd }: { placeholder: string; onAdd: (v: stri
   );
 }
 
-export function Projects({ projects, categories, onChange }: { projects: Project[]; categories: Category[]; onChange: (p: Project[]) => void }) {
+export function Projects({
+  projects,
+  categories,
+  onChange,
+  confirmRemove = () => true,
+}: {
+  projects: Project[];
+  categories: Category[];
+  onChange: (p: Project[]) => void;
+  /** Asked before a project is removed; false keeps it. */
+  confirmRemove?: (p: Project) => boolean;
+}) {
   const update = (id: string, p: Partial<Project>) => onChange(projects.map((x) => (x.id === id ? { ...x, ...p } : x)));
+  const remove = (p: Project) => confirmRemove(p) && onChange(projects.filter((x) => x.id !== p.id));
   const add = (text: string, categoryId?: string) => onChange([...projects, { id: uid(), text, done: false, group: 0, categoryId }]);
   const known = new Set(categories.map((c) => c.id));
   const other = projects.filter((p) => !p.categoryId || !known.has(p.categoryId));
@@ -116,7 +128,9 @@ export function Projects({ projects, categories, onChange }: { projects: Project
           aria-label="Project"
           onBlur={(e) => {
             const v = e.target.value.trim();
-            if (!v) onChange(projects.filter((x) => x.id !== p.id));
+            if (!v) {
+              if (!remove(p)) e.target.value = p.text;
+            }
             else if (v !== p.text) update(p.id, { text: v });
           }}
         />
@@ -151,7 +165,7 @@ export function Projects({ projects, categories, onChange }: { projects: Project
           ))}
         </select>
       )}
-      <button type="button" className="btn btn-icon btn-quiet" aria-label={`Remove "${p.text}"`} onClick={() => onChange(projects.filter((x) => x.id !== p.id))}>
+      <button type="button" className="btn btn-icon btn-quiet" aria-label={`Remove "${p.text}"`} onClick={() => remove(p)}>
         ×
       </button>
     </>

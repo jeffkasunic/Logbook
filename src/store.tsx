@@ -1,5 +1,5 @@
 import { createContext, useContext, useEffect, useReducer, useRef, useState, type ReactNode } from 'react';
-import type { AppState, DayEntry, Quarter } from './types';
+import type { AppState, DayEntry, ProjectDetails, Quarter } from './types';
 import { addDays, inQuarter, quarterDays, quarterOf, todayISO } from './lib/dates';
 import { api } from './lib/api';
 import { SignedOutError } from './lib/auth';
@@ -67,6 +67,8 @@ export type Action =
   | { type: 'updateQuarter'; quarterId: string; patch: Partial<Omit<Quarter, 'id'>> }
   | { type: 'addQuarter' }
   | { type: 'deleteQuarter'; quarterId: string }
+  /** Merges `patch` into a project's page; empty fields are dropped, and so is a page left with nothing on it. */
+  | { type: 'setProjectDetails'; projectId: string; patch: Partial<ProjectDetails> }
   | { type: 'replace'; state: AppState };
 
 function patchDay(q: Quarter, date: string, fn: (d: DayEntry) => DayEntry): Quarter {
@@ -90,6 +92,15 @@ export function quarterFor(state: AppState, date: string): Quarter | undefined {
   return state.quarters.find((q) => inQuarter(q, date));
 }
 
+/** Drops the pages of projects no quarter lists any more, keeping `state` as is when there are none. */
+function prunePages(state: AppState): AppState {
+  if (!state.projectDetails) return state;
+  const ids = new Set(state.quarters.flatMap((q) => q.projects.map((p) => p.id)));
+  const kept = Object.entries(state.projectDetails).filter(([id]) => ids.has(id));
+  if (kept.length === Object.keys(state.projectDetails).length) return state;
+  return { ...state, projectDetails: kept.length ? Object.fromEntries(kept) : undefined };
+}
+
 function reducer(state: AppState, a: Action): AppState {
   switch (a.type) {
     case 'setActive':
@@ -109,7 +120,7 @@ function reducer(state: AppState, a: Action): AppState {
       );
 
     case 'updateQuarter':
-      return mapQuarter(state, a.quarterId, (q) => ({ ...q, ...a.patch }));
+      return prunePages(mapQuarter(state, a.quarterId, (q) => ({ ...q, ...a.patch })));
 
     case 'addQuarter': {
       const last = [...state.quarters].sort((x, y) => x.startDate.localeCompare(y.startDate)).at(-1)!;
@@ -125,7 +136,8 @@ function reducer(state: AppState, a: Action): AppState {
         // Starts the day after the last quarter ends, which lands on the next ISO year's week 1 after a 14-week Q4.
         startDate: addDays(last.startDate, quarterDays(last)),
         days: {},
-        projects: [],
+        // Unfinished projects carry over with the same ids, so their pages on the Projects tab come along.
+        projects: last.projects.filter((p) => !p.done),
         reading: last.reading.filter((r) => r.status !== 'done'),
         sections: last.sections?.map((s) => ({ ...s, items: s.items.filter((i) => !i.done) })),
       };
@@ -135,11 +147,20 @@ function reducer(state: AppState, a: Action): AppState {
     case 'deleteQuarter': {
       if (state.quarters.length <= 1) return state;
       const quarters = state.quarters.filter((q) => q.id !== a.quarterId);
-      return {
+      return prunePages({
         ...state,
         quarters,
         activeQuarterId: state.activeQuarterId === a.quarterId ? quarters.at(-1)!.id : state.activeQuarterId,
-      };
+      });
+    }
+
+    case 'setProjectDetails': {
+      const merged: ProjectDetails = { ...state.projectDetails?.[a.projectId], ...a.patch };
+      for (const k of Object.keys(merged) as (keyof ProjectDetails)[]) if (!merged[k] || merged[k].length === 0) delete merged[k];
+      const projectDetails = { ...state.projectDetails };
+      delete projectDetails[a.projectId];
+      if (Object.keys(merged).length) projectDetails[a.projectId] = merged;
+      return { ...state, projectDetails: Object.keys(projectDetails).length ? projectDetails : undefined };
     }
 
     case 'replace':
@@ -177,6 +198,11 @@ function changes(prev: AppState, next: AppState): Save[] {
   for (const id of before.keys()) {
     if (!next.quarters.some((q) => q.id === id)) saves.push(() => api.deleteQuarter(id));
   }
+
+  const oldDetails = prev.projectDetails ?? {};
+  const newDetails = next.projectDetails ?? {};
+  for (const [id, d] of Object.entries(newDetails)) if (oldDetails[id] !== d) saves.push(() => api.putProject(id, d));
+  for (const id of Object.keys(oldDetails)) if (!(id in newDetails)) saves.push(() => api.deleteProject(id));
   return saves;
 }
 

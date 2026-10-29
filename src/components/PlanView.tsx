@@ -1,7 +1,7 @@
 import { Fragment, useRef, useState, type CSSProperties, type ReactNode } from 'react';
 import { useStore } from '../store';
-import type { Quarter, ReadingItem } from '../types';
-import { seriesVar } from '../lib/colors';
+import type { Project, Quarter, ReadingItem } from '../types';
+import { confirmRemoveProject, projectGroups as groupProjects } from '../lib/projects';
 import { NEXT_STATUS, readingCategories, STATUS_LABEL } from '../lib/reading';
 import { setNote } from '../lib/notes';
 import { arrangeColumns, useColumnCount } from '../lib/useColumns';
@@ -10,15 +10,11 @@ import { Linkify } from './Linkify';
 import { Grip } from './Sortable';
 
 /** The quarter's core focus across the top, then its year goals, projects, reading list and the user's own sections as checklists, in columns the user arranges by dragging. Edit the lists themselves on the Edit tab. */
-export function PlanView({ onEdit }: { onEdit: () => void }) {
-  const { quarter: q, dispatch } = useStore();
+export function PlanView({ onEdit, onOpenProject }: { onEdit: () => void; onOpenProject: (id: string) => void }) {
+  const { state, quarter: q, dispatch } = useStore();
   const patch = (p: Partial<Omit<Quarter, 'id'>>) => dispatch({ type: 'updateQuarter', quarterId: q.id, patch: p });
 
-  const known = new Set(q.categories.map((c) => c.id));
-  const projectGroups = [
-    ...q.categories.map((c, i) => ({ key: c.id, title: c.name, color: seriesVar(i), items: q.projects.filter((p) => p.categoryId === c.id) })),
-    { key: 'other', title: 'Other', color: undefined, items: q.projects.filter((p) => !p.categoryId || !known.has(p.categoryId)) },
-  ].filter((g) => g.items.length > 0);
+  const projectGroups = groupProjects(q);
 
   const readingCats = readingCategories(q);
   const knownReading = new Set(readingCats.map((c) => c.id));
@@ -51,7 +47,7 @@ export function PlanView({ onEdit }: { onEdit: () => void }) {
   const setBookNote = (id: string, note: string) => patch({ reading: q.reading.map((r) => (r.id === id ? { ...r, note: note || undefined } : r)) });
   const stepBook = (id: string) => patch({ reading: q.reading.map((r) => (r.id === id ? { ...r, status: NEXT_STATUS[r.status] } : r)) });
 
-  const removeProject = (id: string) => patch({ projects: q.projects.filter((p) => p.id !== id) });
+  const removeProject = (p: Project) => confirmRemoveProject(state, q.id, p) && patch({ projects: q.projects.filter((x) => x.id !== p.id) });
   const removeGoal = (area: number, k: number, item: string) =>
     patch({
       yearGoals: q.yearGoals.map((g, i) =>
@@ -107,7 +103,8 @@ export function PlanView({ onEdit }: { onEdit: () => void }) {
                   indent={p.indent}
                   onChange={(v) => toggleProject(p.id, v)}
                   onNoteChange={(n) => setProjectNote(p.id, n)}
-                  onRemove={() => removeProject(p.id)}
+                  onOpen={() => onOpenProject(p.id)}
+                  onRemove={() => removeProject(p)}
                 />
               ))}
             </PlanGroup>
@@ -266,6 +263,7 @@ function CheckItem({
   indent,
   onChange,
   onNoteChange,
+  onOpen,
   onRemove,
 }: {
   label: string;
@@ -275,6 +273,8 @@ function CheckItem({
   onChange: (v: boolean) => void;
   /** Set to let the note be added or edited here; otherwise the note only shows. */
   onNoteChange?: (note: string) => void;
+  /** Set to offer a link to the item's page (projects on the Projects tab). */
+  onOpen?: () => void;
   onRemove: () => void;
 }) {
   const [editing, setEditing] = useState(false);
@@ -288,6 +288,11 @@ function CheckItem({
         </span>
       </label>
       {onNoteChange && <NoteButton label={label} hasNote={!!note} onClick={() => setEditing(true)} />}
+      {onOpen && (
+        <button type="button" className="btn btn-icon btn-quiet plan-open-btn" aria-label={`Open the page for “${label}”`} title="Open project page" onClick={onOpen}>
+          ↗
+        </button>
+      )}
       <RemoveButton label={label} onClick={onRemove} />
     </li>
   );

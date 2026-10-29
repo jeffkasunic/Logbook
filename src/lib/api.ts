@@ -1,5 +1,5 @@
 // Calls to the Logbook API (API Gateway → lambda/index.mjs). Every call carries the signed-in user's access token.
-import type { AppState, DayEntry, Quarter } from '../types';
+import type { AppState, DayEntry, ProjectDetails, Quarter } from '../types';
 import { getAccessToken, SignedOutError } from './auth';
 
 const API_URL = 'https://qo7g5yee6f.execute-api.us-east-2.amazonaws.com';
@@ -28,6 +28,8 @@ export const api = {
   putQuarter: (quarter: Quarter) => call('PUT', q(quarter.id), { ...quarter, days: undefined }),
   deleteQuarter: (quarterId: string) => call('DELETE', q(quarterId)),
   putDay: (quarterId: string, date: string, day: DayEntry) => call('PUT', `${q(quarterId)}/days/${encodeURIComponent(date)}`, day),
+  putProject: (projectId: string, details: ProjectDetails) => call('PUT', `/projects/${encodeURIComponent(projectId)}`, details),
+  deleteProject: (projectId: string) => call('DELETE', `/projects/${encodeURIComponent(projectId)}`),
   /** Replaces everything on the server with `state`. */
   replaceAll: (state: AppState) => call('POST', '/import', state),
 };

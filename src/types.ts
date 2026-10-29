@@ -35,6 +35,35 @@ export interface Project {
   note?: string;
 }
 
+/** One of a project's notes, shown oldest first on its page. */
+export interface ProjectNote {
+  id: string;
+  /** ISO date the note was added. */
+  date: string;
+  text: string;
+}
+
+/** A to-do on a project's page. */
+export interface ProjectTask {
+  id: string;
+  text: string;
+  done: boolean;
+  /** Shown one step in, under the task above. */
+  indent?: boolean;
+}
+
+/**
+ * A project's page on the Projects tab, keyed by the project's id. Kept outside its quarter so long notes don't
+ * weigh down the quarter, and so the page is still there after the quarter ends.
+ */
+export interface ProjectDetails {
+  description?: string;
+  /** Shown only on the project's page, not on the Plan tab. */
+  tasks?: ProjectTask[];
+  /** Oldest first; new notes go at the end. */
+  notes?: ProjectNote[];
+}
+
 export type ReadingStatus = 'todo' | 'reading' | 'done';
 
 /** A section of the reading list, e.g. "Fiction". */
@@ -101,4 +130,6 @@ export interface AppState {
   version: 1;
   quarters: Quarter[];
   activeQuarterId: string;
+  /** Project pages, keyed by project id. Projects without one aren't listed. */
+  projectDetails?: Record<string, ProjectDetails>;
 }

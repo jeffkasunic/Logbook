@@ -74,7 +74,7 @@ export function SettingsView() {
         <button type="button" className="btn" onClick={() => dispatch({ type: 'addQuarter' })}>
           Start next quarter
         </button>
-        <p className="hint">The next quarter copies the latest quarter’s categories, goals, focus and unread books, with an empty log.</p>
+        <p className="hint">The next quarter copies the latest quarter’s categories, goals, focus, unfinished projects and unread books, with an empty log.</p>
       </section>
 
       <section className="panel">

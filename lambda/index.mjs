@@ -3,8 +3,9 @@
 //   STATE                      { version, activeQuarterId }
 //   Q#<quarterId>              a Quarter without its days
 //   Q#<quarterId>#D#<date>     a DayEntry { goal, hours?, metrics? }
+//   P#<projectId>              a project's page { description?, tasks?: [{ id, text, done, indent? }], notes?: [{ id, date, text }] }
 import { DynamoDBClient } from '@aws-sdk/client-dynamodb';
-import { BatchWriteCommand, DynamoDBDocumentClient, PutCommand, QueryCommand } from '@aws-sdk/lib-dynamodb';
+import { BatchWriteCommand, DeleteCommand, DynamoDBDocumentClient, PutCommand, QueryCommand } from '@aws-sdk/lib-dynamodb';
 
 const TABLE = process.env.TABLE_NAME ?? 'logbook';
 const db = DynamoDBDocumentClient.from(new DynamoDBClient({}), {
@@ -13,6 +14,8 @@ const db = DynamoDBDocumentClient.from(new DynamoDBClient({}), {
 
 const QUARTER_ID = /^\d{4}-Q[1-4]$/;
 const ISO_DATE = /^\d{4}-\d{2}-\d{2}$/;
+/** Project ids are made by the app (short random strings, or "s-p1" in the sample data). */
+const PROJECT_ID = /^[\w-]{1,64}$/;
 
 // Size limits, so one request can't turn into thousands of DynamoDB writes. Generous for a real log: a quarter of
 // daily entries is well under 100 KB, and 40 quarters is ten years.
@@ -23,6 +26,11 @@ const MAX_QUARTERS = 40;
 const MAX_QUARTER_DAYS = 14 * 7;
 /** Most categories or metrics one day can record. */
 const MAX_RECORD_KEYS = 50;
+/** Most project pages one import can hold. */
+const MAX_PROJECTS = 1000;
+/** Most notes one project page can hold (the 64 KB request limit usually comes first). */
+const MAX_PROJECT_NOTES = 500;
+const MAX_PROJECT_TASKS = 500;
 
 class HttpError extends Error {
   constructor(status, message) {
@@ -58,6 +66,12 @@ export async function handler(event) {
         return json(204);
       case 'PUT /quarters/{quarterId}/days/{date}':
         await putDay(userID, checkQuarterId(p.quarterId), checkDate(p.date), parseBody(event));
+        return json(204);
+      case 'PUT /projects/{projectId}':
+        await putProject(userID, checkProjectId(p.projectId), parseBody(event));
+        return json(204);
+      case 'DELETE /projects/{projectId}':
+        await db.send(new DeleteCommand({ TableName: TABLE, Key: { userID, sk: `P#${checkProjectId(p.projectId)}` } }));
         return json(204);
       case 'POST /import':
         await importState(userID, parseBody(event, MAX_IMPORT_BYTES));
@@ -100,8 +114,10 @@ async function loadState(userID) {
   let state = { version: 1, activeQuarterId: null };
   const quarters = new Map();
   const days = [];
+  const projectDetails = {};
   for (const { userID: _u, sk, ...rest } of items) {
     if (sk === 'STATE') state = { ...state, ...rest };
+    else if (sk.startsWith('P#')) projectDetails[sk.slice(2)] = rest;
     else if (sk.includes('#D#')) days.push([sk, rest]);
     else quarters.set(sk.slice(2), { ...rest, days: {} });
   }
@@ -113,7 +129,8 @@ async function loadState(userID) {
   const list = [...quarters.values()].sort((a, b) => a.startDate.localeCompare(b.startDate));
   if (!list.length) return null;
   if (!quarters.has(state.activeQuarterId)) state.activeQuarterId = list.at(-1).id;
-  return { version: 1, quarters: list, activeQuarterId: state.activeQuarterId };
+  const result = { version: 1, quarters: list, activeQuarterId: state.activeQuarterId };
+  return Object.keys(projectDetails).length ? { ...result, projectDetails } : result;
 }
 
 // ---------- writes ----------
@@ -142,11 +159,31 @@ function dayItem(userID, quarterId, date, body) {
   };
 }
 
+function projectItem(userID, projectId, body) {
+  if (!isObject(body)) throw new HttpError(400, 'invalid project');
+  const { description, tasks, notes } = body;
+  if (description !== undefined && typeof description !== 'string') throw new HttpError(400, 'description must be text');
+  if (tasks !== undefined && !(Array.isArray(tasks) && tasks.length <= MAX_PROJECT_TASKS && tasks.every(isProjectTask))) {
+    throw new HttpError(400, `tasks must be at most ${MAX_PROJECT_TASKS} { id, text, done } entries`);
+  }
+  if (notes !== undefined && !(Array.isArray(notes) && notes.length <= MAX_PROJECT_NOTES && notes.every(isProjectNote))) {
+    throw new HttpError(400, `notes must be at most ${MAX_PROJECT_NOTES} { id, date, text } entries`);
+  }
+  return {
+    userID,
+    sk: `P#${projectId}`,
+    description,
+    tasks: tasks?.length ? tasks.map(({ id, text, done, indent }) => ({ id, text, done, indent: indent === true || undefined })) : undefined,
+    notes: notes?.length ? notes.map(({ id, date, text }) => ({ id, date, text })) : undefined,
+  };
+}
+
 const put = (Item) => db.send(new PutCommand({ TableName: TABLE, Item }));
 
 const putState = (userID, body) => put(stateItem(userID, body));
 const putQuarter = (userID, quarterId, body) => put(quarterItem(userID, quarterId, body));
 const putDay = (userID, quarterId, date, body) => put(dayItem(userID, quarterId, date, body));
+const putProject = (userID, projectId, body) => put(projectItem(userID, projectId, body));
 
 /** Removes a quarter and all of its days. */
 async function deleteQuarter(userID, quarterId) {
@@ -175,6 +212,12 @@ async function importState(userID, body) {
       if (!(offset >= 0 && offset < MAX_QUARTER_DAYS)) throw new HttpError(400, `day ${date} is outside quarter ${quarterId}`);
       items.push(dayItem(userID, quarterId, date, day));
     }
+  }
+  if (body.projectDetails !== undefined) {
+    if (!isObject(body.projectDetails)) throw new HttpError(400, 'invalid project details');
+    const projects = Object.entries(body.projectDetails);
+    if (projects.length > MAX_PROJECTS) throw new HttpError(400, `at most ${MAX_PROJECTS} project pages`);
+    for (const [projectId, details] of projects) items.push(projectItem(userID, checkProjectId(projectId), details));
   }
   const existing = await queryAll(userID);
   await batchWrite(items.map((Item) => ({ PutRequest: { Item } })));
@@ -213,6 +256,11 @@ function checkQuarterId(id) {
   return id;
 }
 
+function checkProjectId(id) {
+  if (typeof id !== 'string' || !PROJECT_ID.test(id)) throw new HttpError(400, 'invalid project id');
+  return id;
+}
+
 function checkDate(date) {
   if (!checkISODate(date)) throw new HttpError(400, 'invalid date');
   return date;
@@ -226,6 +274,10 @@ function checkISODate(date) {
 }
 
 const daysBetween = (a, b) => Math.round((Date.parse(`${b}T00:00:00Z`) - Date.parse(`${a}T00:00:00Z`)) / 86_400_000);
+
+const isProjectTask = (t) => isObject(t) && typeof t.id === 'string' && PROJECT_ID.test(t.id) && typeof t.text === 'string' && typeof t.done === 'boolean';
+
+const isProjectNote = (n) => isObject(n) && typeof n.id === 'string' && PROJECT_ID.test(n.id) && checkISODate(n.date) && typeof n.text === 'string';
 
 const isObject = (v) => typeof v === 'object' && v !== null && !Array.isArray(v);
 
