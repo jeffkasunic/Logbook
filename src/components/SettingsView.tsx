@@ -3,6 +3,7 @@ import { blankState, isValidState, saveGuest, useStore } from '../store';
 import { sampleState } from '../data/sample';
 import { shortDate, addDays, quarterDays } from '../lib/dates';
 import { signIn, signOut, userEmail } from '../lib/auth';
+import { useMasonry } from '../lib/useMasonry';
 import { NumCell } from './NumCell';
 
 /** Quarters, data backup (export, import and restore) and the signed-in account. */
@@ -11,6 +12,7 @@ export function SettingsView() {
   const email = userEmail();
   const [msg, setMsg] = useState<string | null>(null);
   const fileRef = useRef<HTMLInputElement>(null);
+  const grid = useMasonry<HTMLDivElement>();
 
   function exportJSON() {
     const blob = new Blob([JSON.stringify(state, null, 2)], { type: 'application/json' });
@@ -34,7 +36,7 @@ export function SettingsView() {
   }
 
   return (
-    <div className="setup">
+    <div className="setup" ref={grid}>
       <section className="panel">
         <h2>Quarters</h2>
         <label className="field field-inline">

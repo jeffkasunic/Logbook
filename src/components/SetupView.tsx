@@ -5,6 +5,7 @@ import { seriesVar } from '../lib/colors';
 import { NumCell } from './NumCell';
 import { Grip } from './Sortable';
 import { useDragReorder } from '../lib/useDragReorder';
+import { useMasonry } from '../lib/useMasonry';
 import { readingCategories } from '../lib/reading';
 import { CustomSections, Projects, Reading, TextLines, YearGoals } from './PlanSections';
 
@@ -34,6 +35,8 @@ export function SetupView() {
 
   const catDrag = useDragReorder(q.categories, setCats);
   const metricDrag = useDragReorder(q.metrics, setMetrics);
+  const logGrid = useMasonry<HTMLDivElement>();
+  const planGrid = useMasonry<HTMLDivElement>();
 
   const hoursFor = (id: string) => Object.values(q.days).reduce((a, d) => a + (d.hours?.[id] ?? 0), 0);
 
@@ -58,7 +61,7 @@ export function SetupView() {
         <h2 id="edit-log" className="setup-group-title">
           Daily log <span className="count">what you track each day</span>
         </h2>
-        <div className="setup">
+        <div className="setup" ref={logGrid}>
           <section className="panel">
             <h2>Categories in {q.id.replace('-', ' ')}</h2>
             <p className="muted">Each category is a column in the daily log. Weekly goals feed the weekly summary.</p>
@@ -236,7 +239,7 @@ export function SetupView() {
         <h2 id="edit-plan" className="setup-group-title">
           Plan <span className="count">what the Plan tab shows</span>
         </h2>
-        <div className="setup">
+        <div className="setup" ref={planGrid}>
           <section className="panel setup-wide">
             <h2>Core focus</h2>
             <TextLines lines={q.core} notes={q.coreNotes} onChange={(core, coreNotes) => patch({ core, coreNotes })} placeholder="Add a core focus" />

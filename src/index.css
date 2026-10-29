@@ -1048,12 +1048,29 @@ h2 {
 /* ------------------------------------------------------------------ plan (checklist summary) */
 .plan {
   display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+  /* Columns of panels; PlanView sets --plan-cols from how many 300px columns fit. */
+  grid-template-columns: repeat(var(--plan-cols, 1), minmax(0, 1fr));
   gap: 1.25rem;
-  align-items: start;
 }
-.plan-core {
-  grid-column: 1 / -1;
+.plan-col {
+  display: flex;
+  flex-direction: column;
+  gap: 1.25rem;
+  min-width: 0;
+  border-radius: var(--radius);
+}
+.plan-col.drop-into {
+  outline: 2px dashed var(--accent);
+  outline-offset: -2px;
+}
+.plan .panel.drop-before {
+  box-shadow: 0 -0.65rem 0 -0.5rem var(--accent);
+}
+.plan .panel.drop-after {
+  box-shadow: 0 0.65rem 0 -0.5rem var(--accent);
+}
+.plan h2 > .grip {
+  margin-right: -0.4rem;
 }
 .plan-core-lines {
   list-style: none;
@@ -1134,9 +1151,12 @@ div.plan-item {
 }
 @media (hover: hover) {
   .plan-note-btn,
-  .plan-remove {
+  .plan-remove,
+  .plan h2 > .grip {
     opacity: 0;
   }
+  .plan .panel:hover h2 > .grip,
+  .plan h2 > .grip:focus-visible,
   .plan-list li:hover .plan-note-btn,
   .plan-core-lines li:hover .plan-note-btn,
   .plan-list li:hover .plan-remove,
@@ -1388,7 +1408,9 @@ div.plan-item {
 .setup {
   display: grid;
   grid-template-columns: repeat(2, minmax(0, 1fr));
-  gap: 1.25rem;
+  /* Masonry, as on .plan: useMasonry spans each panel over these 1px rows. */
+  grid-auto-rows: 1px;
+  column-gap: 1.25rem;
   align-items: start;
 }
 .setup-group + .setup-group {

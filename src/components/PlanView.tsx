@@ -1,12 +1,15 @@
-import { useRef, useState, type ReactNode } from 'react';
+import { Fragment, useRef, useState, type CSSProperties, type ReactNode } from 'react';
 import { useStore } from '../store';
 import type { Quarter, ReadingItem } from '../types';
 import { seriesVar } from '../lib/colors';
 import { NEXT_STATUS, readingCategories, STATUS_LABEL } from '../lib/reading';
 import { setNote } from '../lib/notes';
+import { arrangeColumns, useColumnCount } from '../lib/useColumns';
+import { useDragColumns } from '../lib/useDragReorder';
 import { Linkify } from './Linkify';
+import { Grip } from './Sortable';
 
-/** The quarter's core focus, then its year goals, projects, reading list and the user's own sections as checklists. Edit the lists themselves on the Edit tab. */
+/** The quarter's core focus, year goals, projects, reading list and the user's own sections as checklists, in columns the user arranges by dragging. Edit the lists themselves on the Edit tab. */
 export function PlanView({ onEdit }: { onEdit: () => void }) {
   const { quarter: q, dispatch } = useStore();
   const patch = (p: Partial<Omit<Quarter, 'id'>>) => dispatch({ type: 'updateQuarter', quarterId: q.id, patch: p });
@@ -58,100 +61,145 @@ export function PlanView({ onEdit }: { onEdit: () => void }) {
   const removeItem = (sectionId: string, itemId: string) =>
     patch({ sections: q.sections?.map((sec) => (sec.id !== sectionId ? sec : { ...sec, items: sec.items.filter((it) => it.id !== itemId) })) });
   const removeBook = (id: string) => patch({ reading: q.reading.filter((r) => r.id !== id) });
+  const [grid, colCount] = useColumnCount<HTMLDivElement>(300);
 
-  return (
-    <div className="plan">
-      <section className="panel plan-core">
-        <h2>Core focus</h2>
-        {q.core.length > 0 ? (
-          <ul className="plan-core-lines">
-            {q.core.map((l, i) => (
-              <CoreLine key={`${i}-${l}`} line={l} note={q.coreNotes?.[l]} onNoteChange={(n) => patch({ coreNotes: setNote(q.coreNotes, l, n) })} />
-            ))}
-          </ul>
-        ) : (
-          <p className="muted">
-            No focus set for this quarter.{' '}
-            <button type="button" className="link-btn" onClick={onEdit}>
-              Add it on the Edit tab
-            </button>
-          </p>
-        )}
-      </section>
-
-      <PlanPanel title={`${q.year} goals`} done={goalsDone} total={goalsTotal} empty="No year goals yet." onEdit={onEdit}>
-        {q.yearGoals.map(
-          (g, i) =>
-            g.items.length > 0 && (
-              <PlanGroup key={`${i}-${g.title}`} title={g.title}>
-                {g.items.map((it, k) => (
-                  <CheckItem
-                    key={`${k}-${it}`}
-                    label={it}
-                    note={g.notes?.[it]}
-                    checked={!!g.done?.includes(it)}
-                    indent={g.indented?.includes(it)}
-                    onChange={(v) => toggleGoal(i, it, v)}
-                    onNoteChange={(n) => setGoalItemNote(i, it, n)}
-                    onRemove={() => removeGoal(i, k, it)}
-                  />
-                ))}
-              </PlanGroup>
-            ),
-        )}
-      </PlanPanel>
-
-      <PlanPanel title={`${q.id.replace('-', ' ')} projects`} done={q.projects.filter((p) => p.done).length} total={q.projects.length} empty="No projects yet." onEdit={onEdit}>
-        {projectGroups.map((g) => (
-          <PlanGroup key={g.key} title={g.title} color={g.color}>
-            {g.items.map((p) => (
-              <CheckItem
-                key={p.id}
-                label={p.text}
-                note={p.note}
-                checked={p.done}
-                indent={p.indent}
-                onChange={(v) => toggleProject(p.id, v)}
-                onNoteChange={(n) => setProjectNote(p.id, n)}
-                onRemove={() => removeProject(p.id)}
-              />
-            ))}
-          </PlanGroup>
-        ))}
-      </PlanPanel>
-
-      <PlanPanel title="Reading list" done={q.reading.filter((r) => r.status === 'done').length} total={q.reading.length} empty="No books yet." onEdit={onEdit}>
-        {readingGroups.map((g) => {
-          const books = g.books;
-          return (
-            books.length > 0 && (
-              <PlanGroup key={g.key} title={g.title}>
-                {books.map((r) => (
-                  <BookItem key={r.id} book={r} onStep={() => stepBook(r.id)} onNoteChange={(n) => setBookNote(r.id, n)} onRemove={() => removeBook(r.id)} />
-                ))}
-              </PlanGroup>
-            )
-          );
-        })}
-      </PlanPanel>
-
-      {(q.sections ?? []).map((sec) => (
-        <PlanPanel key={sec.id} title={sec.title} done={sec.items.filter((x) => x.done).length} total={sec.items.length} empty="Nothing here yet." onEdit={onEdit}>
+  const panels: { id: string; label: string; render: (box: PanelBox, grip: ReactNode) => ReactNode }[] = [
+    {
+      id: 'core',
+      label: 'Core focus',
+      render: (box, grip) => (
+        <section {...box} className={['panel plan-core', box.className].filter(Boolean).join(' ')}>
+          <h2>
+            {grip}
+            Core focus
+          </h2>
+          {q.core.length > 0 ? (
+            <ul className="plan-core-lines">
+              {q.core.map((l, i) => (
+                <CoreLine key={`${i}-${l}`} line={l} note={q.coreNotes?.[l]} onNoteChange={(n) => patch({ coreNotes: setNote(q.coreNotes, l, n) })} />
+              ))}
+            </ul>
+          ) : (
+            <p className="muted">
+              No focus set for this quarter.{' '}
+              <button type="button" className="link-btn" onClick={onEdit}>
+                Add it on the Edit tab
+              </button>
+            </p>
+          )}
+        </section>
+      ),
+    },
+    {
+      id: 'goals',
+      label: `${q.year} goals`,
+      render: (box, grip) => (
+        <PlanPanel box={box} grip={grip} title={`${q.year} goals`} done={goalsDone} total={goalsTotal} empty="No year goals yet." onEdit={onEdit}>
+          {q.yearGoals.map(
+            (g, i) =>
+              g.items.length > 0 && (
+                <PlanGroup key={`${i}-${g.title}`} title={g.title}>
+                  {g.items.map((it, k) => (
+                    <CheckItem
+                      key={`${k}-${it}`}
+                      label={it}
+                      note={g.notes?.[it]}
+                      checked={!!g.done?.includes(it)}
+                      indent={g.indented?.includes(it)}
+                      onChange={(v) => toggleGoal(i, it, v)}
+                      onNoteChange={(n) => setGoalItemNote(i, it, n)}
+                      onRemove={() => removeGoal(i, k, it)}
+                    />
+                  ))}
+                </PlanGroup>
+              ),
+          )}
+        </PlanPanel>
+      ),
+    },
+    {
+      id: 'projects',
+      label: `${q.id.replace('-', ' ')} projects`,
+      render: (box, grip) => (
+        <PlanPanel box={box} grip={grip} title={`${q.id.replace('-', ' ')} projects`} done={q.projects.filter((p) => p.done).length} total={q.projects.length} empty="No projects yet." onEdit={onEdit}>
+          {projectGroups.map((g) => (
+            <PlanGroup key={g.key} title={g.title} color={g.color}>
+              {g.items.map((p) => (
+                <CheckItem
+                  key={p.id}
+                  label={p.text}
+                  note={p.note}
+                  checked={p.done}
+                  indent={p.indent}
+                  onChange={(v) => toggleProject(p.id, v)}
+                  onNoteChange={(n) => setProjectNote(p.id, n)}
+                  onRemove={() => removeProject(p.id)}
+                />
+              ))}
+            </PlanGroup>
+          ))}
+        </PlanPanel>
+      ),
+    },
+    {
+      id: 'reading',
+      label: 'Reading list',
+      render: (box, grip) => (
+        <PlanPanel box={box} grip={grip} title="Reading list" done={q.reading.filter((r) => r.status === 'done').length} total={q.reading.length} empty="No books yet." onEdit={onEdit}>
+          {readingGroups.map((g) => {
+            const books = g.books;
+            return (
+              books.length > 0 && (
+                <PlanGroup key={g.key} title={g.title}>
+                  {books.map((r) => (
+                    <BookItem key={r.id} book={r} onStep={() => stepBook(r.id)} onNoteChange={(n) => setBookNote(r.id, n)} onRemove={() => removeBook(r.id)} />
+                  ))}
+                </PlanGroup>
+              )
+            );
+          })}
+        </PlanPanel>
+      ),
+    },
+    ...(q.sections ?? []).map((sec) => ({
+      id: sec.id,
+      label: sec.title,
+      render: (box: PanelBox, grip: ReactNode) => (
+        <PlanPanel box={box} grip={grip} title={sec.title} done={sec.items.filter((x) => x.done).length} total={sec.items.length} empty="Nothing here yet." onEdit={onEdit}>
           <ul className="checklist plan-list">
             {sec.items.map((it) => (
               <CheckItem key={it.id} label={it.text} note={it.note} checked={it.done} indent={it.indent} onChange={(v) => toggleItem(sec.id, it.id, v)} onNoteChange={(n) => setItemNote(sec.id, it.id, n)} onRemove={() => removeItem(sec.id, it.id)} />
             ))}
           </ul>
         </PlanPanel>
+      ),
+    })),
+  ];
+  const byId = new Map(panels.map((p) => [p.id, p]));
+  const cols = arrangeColumns(q.planLayout, panels.map((p) => p.id), colCount);
+  const drag = useDragColumns(cols, (planLayout) => patch({ planLayout }));
+
+  return (
+    <div className="plan" ref={grid} style={{ '--plan-cols': colCount } as CSSProperties}>
+      {cols.map((col, j) => (
+        <div key={j} {...drag.column(j)} className={['plan-col', drag.column(j).className].filter(Boolean).join(' ')}>
+          {col.map((id) => {
+            const p = byId.get(id)!;
+            return <Fragment key={id}>{p.render(drag.panel(id, p.label), <Grip {...drag.grip(id, p.label)} />)}</Fragment>;
+          })}
+        </div>
       ))}
     </div>
   );
 }
 
-function PlanPanel({ title, done, total, empty, onEdit, children }: { title: string; done: number; total: number; empty: string; onEdit: () => void; children: ReactNode }) {
+type PanelBox = ReturnType<ReturnType<typeof useDragColumns>['panel']>;
+
+function PlanPanel({ box, grip, title, done, total, empty, onEdit, children }: { box: PanelBox; grip: ReactNode; title: string; done: number; total: number; empty: string; onEdit: () => void; children: ReactNode }) {
   return (
-    <section className="panel plan-panel">
+    <section {...box} className={['panel plan-panel', box.className].filter(Boolean).join(' ')}>
       <h2>
+        {grip}
         {title}
         <span className="count">
           {done}/{total} done
