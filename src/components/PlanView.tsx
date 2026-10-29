@@ -3,6 +3,7 @@ import { useStore } from '../store';
 import type { Quarter, ReadingItem } from '../types';
 import { seriesVar } from '../lib/colors';
 import { NEXT_STATUS, readingCategories, STATUS_LABEL } from '../lib/reading';
+import { setNote } from '../lib/notes';
 import { Linkify } from './Linkify';
 
 /** The quarter's core focus, then its year goals, projects, reading list and the user's own sections as checklists. Edit the lists themselves on the Edit tab. */
@@ -33,6 +34,9 @@ export function PlanView({ onEdit }: { onEdit: () => void }) {
         i !== area ? g : { ...g, done: done ? [...(g.done ?? []), item] : (g.done ?? []).filter((x) => x !== item) },
       ),
     });
+  const setProjectNote = (id: string, note: string) => patch({ projects: q.projects.map((p) => (p.id === id ? { ...p, note: note || undefined } : p)) });
+  const setGoalItemNote = (area: number, item: string, note: string) =>
+    patch({ yearGoals: q.yearGoals.map((g, i) => (i !== area ? g : { ...g, notes: setNote(g.notes, item, note) })) });
   const toggleItem = (sectionId: string, itemId: string, done: boolean) =>
     patch({
       sections: q.sections?.map((sec) => (sec.id !== sectionId ? sec : { ...sec, items: sec.items.map((it) => (it.id === itemId ? { ...it, done } : it)) })),
@@ -48,7 +52,7 @@ export function PlanView({ onEdit }: { onEdit: () => void }) {
   const removeGoal = (area: number, k: number, item: string) =>
     patch({
       yearGoals: q.yearGoals.map((g, i) =>
-        i !== area ? g : { ...g, items: g.items.filter((_, j) => j !== k), done: g.done?.filter((x) => x !== item), indented: g.indented?.filter((x) => x !== item) },
+        i !== area ? g : { ...g, items: g.items.filter((_, j) => j !== k), done: g.done?.filter((x) => x !== item), indented: g.indented?.filter((x) => x !== item), notes: setNote(g.notes, item, '') },
       ),
     });
   const removeItem = (sectionId: string, itemId: string) =>
@@ -62,7 +66,7 @@ export function PlanView({ onEdit }: { onEdit: () => void }) {
         {q.core.length > 0 ? (
           <ul className="plan-core-lines">
             {q.core.map((l, i) => (
-              <li key={i}>{l}</li>
+              <CoreLine key={`${i}-${l}`} line={l} note={q.coreNotes?.[l]} onNoteChange={(n) => patch({ coreNotes: setNote(q.coreNotes, l, n) })} />
             ))}
           </ul>
         ) : (
@@ -81,7 +85,16 @@ export function PlanView({ onEdit }: { onEdit: () => void }) {
             g.items.length > 0 && (
               <PlanGroup key={`${i}-${g.title}`} title={g.title}>
                 {g.items.map((it, k) => (
-                  <CheckItem key={`${k}-${it}`} label={it} checked={!!g.done?.includes(it)} indent={g.indented?.includes(it)} onChange={(v) => toggleGoal(i, it, v)} onRemove={() => removeGoal(i, k, it)} />
+                  <CheckItem
+                    key={`${k}-${it}`}
+                    label={it}
+                    note={g.notes?.[it]}
+                    checked={!!g.done?.includes(it)}
+                    indent={g.indented?.includes(it)}
+                    onChange={(v) => toggleGoal(i, it, v)}
+                    onNoteChange={(n) => setGoalItemNote(i, it, n)}
+                    onRemove={() => removeGoal(i, k, it)}
+                  />
                 ))}
               </PlanGroup>
             ),
@@ -92,7 +105,16 @@ export function PlanView({ onEdit }: { onEdit: () => void }) {
         {projectGroups.map((g) => (
           <PlanGroup key={g.key} title={g.title} color={g.color}>
             {g.items.map((p) => (
-              <CheckItem key={p.id} label={p.text} checked={p.done} indent={p.indent} onChange={(v) => toggleProject(p.id, v)} onRemove={() => removeProject(p.id)} />
+              <CheckItem
+                key={p.id}
+                label={p.text}
+                note={p.note}
+                checked={p.done}
+                indent={p.indent}
+                onChange={(v) => toggleProject(p.id, v)}
+                onNoteChange={(n) => setProjectNote(p.id, n)}
+                onRemove={() => removeProject(p.id)}
+              />
             ))}
           </PlanGroup>
         ))}
@@ -161,6 +183,20 @@ function PlanGroup({ title, color, children }: { title: string; color?: string; 
       </h3>
       <ul className="checklist plan-list">{children}</ul>
     </div>
+  );
+}
+
+/** A core focus line with its note. */
+function CoreLine({ line, note, onNoteChange }: { line: string; note?: string; onNoteChange: (note: string) => void }) {
+  const [editing, setEditing] = useState(false);
+  return (
+    <li>
+      <span className="plan-core-text">
+        {line}
+        <PlanNote note={note} label={line} editing={editing} onSave={onNoteChange} onDone={() => setEditing(false)} />
+      </span>
+      <NoteButton label={line} hasNote={!!note} onClick={() => setEditing(true)} />
+    </li>
   );
 }
 

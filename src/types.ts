@@ -32,6 +32,7 @@ export interface Project {
   categoryId?: string;
   /** Shown one step in, under the category's other projects. */
   indent?: boolean;
+  note?: string;
 }
 
 export type ReadingStatus = 'todo' | 'reading' | 'done';
@@ -66,6 +67,8 @@ export interface GoalArea {
   done?: string[];
   /** Items shown one step in, stored by their text. */
   indented?: string[];
+  /** Notes on items, keyed by their text. */
+  notes?: Record<string, string>;
 }
 
 export interface Quarter {
@@ -81,6 +84,8 @@ export interface Quarter {
   /** Keyed by ISO date. */
   days: Record<string, DayEntry>;
   core: string[];
+  /** Notes on core focus lines, keyed by their text. */
+  coreNotes?: Record<string, string>;
   yearGoals: GoalArea[];
   projects: Project[];
   reading: ReadingItem[];

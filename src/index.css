@@ -1061,9 +1061,20 @@ h2 {
   padding: 0;
 }
 .plan-core-lines li {
+  display: flex;
+  align-items: flex-start;
+  gap: 0.4rem;
   font-size: 1.35rem;
   font-weight: 500;
   line-height: 1.35;
+}
+.plan-core-text {
+  flex: 1;
+  min-width: 0;
+}
+.plan-core-lines .plan-note,
+.plan-core-lines .plan-note-input {
+  font-weight: 400;
 }
 .plan-core-lines li + li {
   margin-top: 0.3rem;
@@ -1127,6 +1138,7 @@ div.plan-item {
     opacity: 0;
   }
   .plan-list li:hover .plan-note-btn,
+  .plan-core-lines li:hover .plan-note-btn,
   .plan-list li:hover .plan-remove,
   .plan-note-btn:focus-visible,
   .plan-remove:focus-visible {
@@ -1244,7 +1256,8 @@ div.plan-item {
 .lines > li.is-indented {
   padding-left: 1.5rem;
 }
-.reading .project-move {
+.reading .project-move,
+.custom-items .project-move {
   margin-top: 3px;
 }
 .project-move {

@@ -2,39 +2,65 @@
 import { Fragment, useState } from 'react';
 import type { Category, GoalArea, PlanSection, Project, ReadingCategory, ReadingItem } from '../types';
 import { seriesVar } from '../lib/colors';
+import { setNote, type TextNotes } from '../lib/notes';
 import { mergeSubset } from '../lib/useDragReorder';
 import { SortableList } from './Sortable';
 
 const uid = () => Math.random().toString(36).slice(2, 9);
 
-export function TextLines({ lines, onChange, placeholder }: { lines: string[]; onChange: (l: string[]) => void; placeholder: string }) {
+export function TextLines({
+  lines,
+  notes,
+  onChange,
+  placeholder,
+}: {
+  lines: string[];
+  /** Notes on the lines, keyed by their text. */
+  notes?: TextNotes;
+  onChange: (l: string[], notes?: TextNotes) => void;
+  placeholder: string;
+}) {
   return (
     <SortableList
-      className="lines"
+      className="lines custom-items"
       items={lines}
-      onReorder={onChange}
+      onReorder={(l) => onChange(l, notes)}
       itemKey={(l, i) => `${i}-${l}`}
       itemLabel={(l) => l}
       renderItem={(l, i) => (
         <>
-          <input
-            className="line-input line-input-lg"
-            defaultValue={l}
-            aria-label={`Focus ${i + 1}`}
-            onBlur={(e) => {
-              const v = e.target.value.trim();
-              if (v === l) return;
-              onChange(v ? lines.map((x, j) => (j === i ? v : x)) : lines.filter((_, j) => j !== i));
-            }}
-          />
-          <button type="button" className="btn btn-icon btn-quiet" aria-label={`Remove “${l}”`} onClick={() => onChange(lines.filter((_, j) => j !== i))}>
+          <div className="custom-item-text">
+            <input
+              className="line-input line-input-lg"
+              defaultValue={l}
+              aria-label={`Focus ${i + 1}`}
+              onBlur={(e) => {
+                const v = e.target.value.trim();
+                if (v === l) return;
+                // Carry the note over to the renamed line, or drop it with a removed one.
+                const rest = setNote(notes, l, '');
+                onChange(v ? lines.map((x, j) => (j === i ? v : x)) : lines.filter((_, j) => j !== i), v ? setNote(rest, v, notes?.[l] ?? '') : rest);
+              }}
+            />
+            <input
+              className="line-input custom-item-note"
+              defaultValue={notes?.[l] ?? ''}
+              placeholder="Note"
+              aria-label={`Note on ${l}`}
+              onBlur={(e) => {
+                const v = e.target.value.trim();
+                if (v !== (notes?.[l] ?? '')) onChange(lines, setNote(notes, l, v));
+              }}
+            />
+          </div>
+          <button type="button" className="btn btn-icon btn-quiet" aria-label={`Remove “${l}”`} onClick={() => onChange(lines.filter((_, j) => j !== i), setNote(notes, l, ''))}>
             ×
           </button>
         </>
       )}
       after={
         <li className="sortable-add">
-          <AddInput placeholder={placeholder} onAdd={(v) => onChange([...lines, v])} />
+          <AddInput placeholder={placeholder} onAdd={(v) => onChange([...lines, v], notes)} />
         </li>
       }
     />
@@ -71,7 +97,7 @@ export function Projects({ projects, categories, onChange }: { projects: Project
 
   const list = (items: Project[], moveable: boolean) => (
     <SortableList
-      className="checklist"
+      className="checklist custom-items"
       items={items}
       onReorder={(r) => onChange(mergeSubset(projects, items, r))}
       itemKey={(p) => p.id}
@@ -83,16 +109,28 @@ export function Projects({ projects, categories, onChange }: { projects: Project
 
   const row = (p: Project, moveable: boolean) => (
     <>
-      <input
-        className="line-input"
-        defaultValue={p.text}
-        aria-label="Project"
-        onBlur={(e) => {
-          const v = e.target.value.trim();
-          if (!v) onChange(projects.filter((x) => x.id !== p.id));
-          else if (v !== p.text) update(p.id, { text: v });
-        }}
-      />
+      <div className="custom-item-text">
+        <input
+          className="line-input"
+          defaultValue={p.text}
+          aria-label="Project"
+          onBlur={(e) => {
+            const v = e.target.value.trim();
+            if (!v) onChange(projects.filter((x) => x.id !== p.id));
+            else if (v !== p.text) update(p.id, { text: v });
+          }}
+        />
+        <input
+          className="line-input custom-item-note"
+          defaultValue={p.note ?? ''}
+          placeholder="Note"
+          aria-label={`Note on ${p.text}`}
+          onBlur={(e) => {
+            const v = e.target.value.trim();
+            if (v !== (p.note ?? '')) update(p.id, { note: v || undefined });
+          }}
+        />
+      </div>
       <button
         type="button"
         className="btn btn-icon btn-quiet"
@@ -188,7 +226,7 @@ export function YearGoals({ areas, onChange }: { areas: GoalArea[]; onChange: (a
               </button>
             </div>
             <SortableList
-              className="lines"
+              className="lines custom-items"
               items={a.items}
               onReorder={(items) => setArea(i, { ...a, items })}
               itemKey={(it, k) => `${k}-${it}`}
@@ -196,18 +234,37 @@ export function YearGoals({ areas, onChange }: { areas: GoalArea[]; onChange: (a
               itemClass={(it) => (a.indented?.includes(it) ? 'is-indented' : undefined)}
               renderItem={(it, k) => (
                 <>
-                  <input
-                    className="line-input"
-                    defaultValue={it}
-                    aria-label={`${a.title} goal`}
-                    onBlur={(e) => {
-                      const v = e.target.value.trim();
-                      if (v === it) return;
-                      // Carry the Plan tab's check mark and the indent over to the renamed item, or drop them with a removed one.
-                      const carry = (list?: string[]) => (list?.includes(it) ? [...list.filter((x) => x !== it), ...(v ? [v] : [])] : list);
-                      setArea(i, { ...a, items: v ? a.items.map((x, j) => (j === k ? v : x)) : a.items.filter((_, j) => j !== k), done: carry(a.done), indented: carry(a.indented) });
-                    }}
-                  />
+                  <div className="custom-item-text">
+                    <input
+                      className="line-input"
+                      defaultValue={it}
+                      aria-label={`${a.title} goal`}
+                      onBlur={(e) => {
+                        const v = e.target.value.trim();
+                        if (v === it) return;
+                        // Carry the Plan tab's check mark, the indent and the note over to the renamed item, or drop them with a removed one.
+                        const carry = (list?: string[]) => (list?.includes(it) ? [...list.filter((x) => x !== it), ...(v ? [v] : [])] : list);
+                        const notes = setNote(a.notes, it, '');
+                        setArea(i, {
+                          ...a,
+                          items: v ? a.items.map((x, j) => (j === k ? v : x)) : a.items.filter((_, j) => j !== k),
+                          done: carry(a.done),
+                          indented: carry(a.indented),
+                          notes: v ? setNote(notes, v, a.notes?.[it] ?? '') : notes,
+                        });
+                      }}
+                    />
+                    <input
+                      className="line-input custom-item-note"
+                      defaultValue={a.notes?.[it] ?? ''}
+                      placeholder="Note"
+                      aria-label={`Note on ${it}`}
+                      onBlur={(e) => {
+                        const v = e.target.value.trim();
+                        if (v !== (a.notes?.[it] ?? '')) setArea(i, { ...a, notes: setNote(a.notes, it, v) });
+                      }}
+                    />
+                  </div>
                   <button
                     type="button"
                     className="btn btn-icon btn-quiet"
@@ -225,7 +282,9 @@ export function YearGoals({ areas, onChange }: { areas: GoalArea[]; onChange: (a
                     type="button"
                     className="btn btn-icon btn-quiet"
                     aria-label={`Remove “${it}”`}
-                    onClick={() => setArea(i, { ...a, items: a.items.filter((_, j) => j !== k), done: a.done?.filter((x) => x !== it), indented: a.indented?.filter((x) => x !== it) })}
+                    onClick={() =>
+                      setArea(i, { ...a, items: a.items.filter((_, j) => j !== k), done: a.done?.filter((x) => x !== it), indented: a.indented?.filter((x) => x !== it), notes: setNote(a.notes, it, '') })
+                    }
                   >
                     ×
                   </button>

@@ -239,7 +239,7 @@ export function SetupView() {
         <div className="setup">
           <section className="panel setup-wide">
             <h2>Core focus</h2>
-            <TextLines lines={q.core} onChange={(core) => patch({ core })} placeholder="Add a core focus" />
+            <TextLines lines={q.core} notes={q.coreNotes} onChange={(core, coreNotes) => patch({ core, coreNotes })} placeholder="Add a core focus" />
           </section>
 
           <section className="panel setup-wide">
