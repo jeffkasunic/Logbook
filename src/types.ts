@@ -93,7 +93,7 @@ export interface Quarter {
   readingCategories?: ReadingCategory[];
   /** User-added checklists shown on the Plan tab after the reading list. */
   sections?: PlanSection[];
-  /** The Plan tab's panels as columns, top to bottom: 'core', 'goals', 'projects', 'reading' and section ids. Panels it doesn't list go in the column with the fewest. */
+  /** The Plan tab's panels as columns, top to bottom: 'goals', 'projects', 'reading' and section ids (core focus always sits above them). Panels it doesn't list go in the column with the fewest. */
   planLayout?: string[][];
 }
 

@@ -9,7 +9,7 @@ import { useDragColumns } from '../lib/useDragReorder';
 import { Linkify } from './Linkify';
 import { Grip } from './Sortable';
 
-/** The quarter's core focus, year goals, projects, reading list and the user's own sections as checklists, in columns the user arranges by dragging. Edit the lists themselves on the Edit tab. */
+/** The quarter's core focus across the top, then its year goals, projects, reading list and the user's own sections as checklists, in columns the user arranges by dragging. Edit the lists themselves on the Edit tab. */
 export function PlanView({ onEdit }: { onEdit: () => void }) {
   const { quarter: q, dispatch } = useStore();
   const patch = (p: Partial<Omit<Quarter, 'id'>>) => dispatch({ type: 'updateQuarter', quarterId: q.id, patch: p });
@@ -64,32 +64,6 @@ export function PlanView({ onEdit }: { onEdit: () => void }) {
   const [grid, colCount] = useColumnCount<HTMLDivElement>(300);
 
   const panels: { id: string; label: string; render: (box: PanelBox, grip: ReactNode) => ReactNode }[] = [
-    {
-      id: 'core',
-      label: 'Core focus',
-      render: (box, grip) => (
-        <section {...box} className={['panel plan-core', box.className].filter(Boolean).join(' ')}>
-          <h2>
-            {grip}
-            Core focus
-          </h2>
-          {q.core.length > 0 ? (
-            <ul className="plan-core-lines">
-              {q.core.map((l, i) => (
-                <CoreLine key={`${i}-${l}`} line={l} note={q.coreNotes?.[l]} onNoteChange={(n) => patch({ coreNotes: setNote(q.coreNotes, l, n) })} />
-              ))}
-            </ul>
-          ) : (
-            <p className="muted">
-              No focus set for this quarter.{' '}
-              <button type="button" className="link-btn" onClick={onEdit}>
-                Add it on the Edit tab
-              </button>
-            </p>
-          )}
-        </section>
-      ),
-    },
     {
       id: 'goals',
       label: `${q.year} goals`,
@@ -181,6 +155,23 @@ export function PlanView({ onEdit }: { onEdit: () => void }) {
 
   return (
     <div className="plan" ref={grid} style={{ '--plan-cols': colCount } as CSSProperties}>
+      <section className="panel plan-core">
+        <h2>Core focus</h2>
+        {q.core.length > 0 ? (
+          <ul className="plan-core-lines">
+            {q.core.map((l, i) => (
+              <CoreLine key={`${i}-${l}`} line={l} note={q.coreNotes?.[l]} onNoteChange={(n) => patch({ coreNotes: setNote(q.coreNotes, l, n) })} />
+            ))}
+          </ul>
+        ) : (
+          <p className="muted">
+            No focus set for this quarter.{' '}
+            <button type="button" className="link-btn" onClick={onEdit}>
+              Add it on the Edit tab
+            </button>
+          </p>
+        )}
+      </section>
       {cols.map((col, j) => (
         <div key={j} {...drag.column(j)} className={['plan-col', drag.column(j).className].filter(Boolean).join(' ')}>
           {col.map((id) => {

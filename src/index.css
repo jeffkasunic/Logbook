@@ -1052,6 +1052,9 @@ h2 {
   grid-template-columns: repeat(var(--plan-cols, 1), minmax(0, 1fr));
   gap: 1.25rem;
 }
+.plan-core {
+  grid-column: 1 / -1;
+}
 .plan-col {
   display: flex;
   flex-direction: column;
