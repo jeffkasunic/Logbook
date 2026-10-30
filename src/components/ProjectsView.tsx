@@ -37,7 +37,7 @@ export function ProjectsView({ selected, onSelect, onEdit }: { selected: string 
   }
 
   const item = (p: Project, color?: string, sub?: string) => (
-    <li key={p.id}>
+    <li key={p.id} className={p.indent && !sub ? 'is-indented' : undefined}>
       <button
         type="button"
         className={['projects-nav-btn', p.id === current.p.id && 'is-active', p.done && 'is-done'].filter(Boolean).join(' ')}

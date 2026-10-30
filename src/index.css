@@ -1220,6 +1220,9 @@ div.plan-item {
   margin: 0.2rem 0 0;
   padding: 0;
 }
+.projects-nav-list > li.is-indented {
+  padding-left: 1.5rem;
+}
 .projects-nav-btn {
   display: flex;
   align-items: baseline;
