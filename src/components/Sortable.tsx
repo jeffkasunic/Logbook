@@ -16,6 +16,8 @@ interface SortableListProps<T> {
   itemKey: (item: T, i: number) => string;
   itemLabel: (item: T) => string;
   itemClass?: (item: T) => string | undefined;
+  /** How deep an item sits; an item drags along the deeper items right after it. */
+  itemLevel?: (item: T) => number;
   renderItem: (item: T, i: number) => ReactNode;
   className?: string;
   /** Rendered after the rows, inside the list (e.g. an add row). */
@@ -23,8 +25,8 @@ interface SortableListProps<T> {
 }
 
 /** A <ul> whose rows can be dragged by their grip to reorder them. */
-export function SortableList<T>({ items, onReorder, itemKey, itemLabel, itemClass, renderItem, className, after }: SortableListProps<T>) {
-  const drag = useDragReorder(items, onReorder);
+export function SortableList<T>({ items, onReorder, itemKey, itemLabel, itemClass, itemLevel, renderItem, className, after }: SortableListProps<T>) {
+  const drag = useDragReorder(items, onReorder, itemLevel);
   return (
     <ul className={['sortable', className].filter(Boolean).join(' ')}>
       {items.map((it, i) => {

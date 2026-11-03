@@ -1,10 +1,10 @@
 import { useState, type DragEvent, type KeyboardEvent } from 'react';
 
-/** Move the item at `from` so it sits before index `to` (0..length). */
-export function moveTo<T>(arr: T[], from: number, to: number): T[] {
+/** Move the `n` items starting at `from` so they sit before index `to` (0..length). */
+export function moveTo<T>(arr: T[], from: number, to: number, n = 1): T[] {
   const next = [...arr];
-  const [item] = next.splice(from, 1);
-  next.splice(to > from ? to - 1 : to, 0, item);
+  const block = next.splice(from, n);
+  next.splice(to > from ? to - n : to, 0, ...block);
   return next;
 }
 
@@ -19,12 +19,37 @@ export function mergeSubset<T>(all: T[], subset: T[], reordered: T[]): T[] {
  * Drag-to-reorder for a list or table. Rows only become draggable while their grip is held,
  * so the inputs inside stay selectable. The grip also moves its row with the arrow keys.
  * Events are stopped here so lists nested inside a sortable row don't move their parent.
+ *
+ * With `level`, a row carries the rows after it that sit deeper (its sub-items) wherever it goes,
+ * and the arrow keys step a row past its neighbour's whole block.
  */
-export function useDragReorder<T>(items: T[], onReorder: (items: T[]) => void) {
+export function useDragReorder<T>(items: T[], onReorder: (items: T[]) => void, level?: (item: T) => number) {
   const [armed, setArmed] = useState<number | null>(null);
   const [drag, setDrag] = useState<{ from: number; to: number } | null>(null);
-  const moves = (d: typeof drag): d is { from: number; to: number } => d != null && d.to !== d.from && d.to !== d.from + 1;
+  const depth = (i: number) => level?.(items[i]) ?? 0;
+  /** How many rows move with row i: itself and the deeper rows right after it. */
+  const span = (i: number) => {
+    let n = 1;
+    while (i + n < items.length && depth(i + n) > depth(i)) n++;
+    return n;
+  };
+  const moves = (d: typeof drag): d is { from: number; to: number } => d != null && (d.to < d.from || d.to > d.from + span(d.from));
   const dropAt = (i: number) => moves(drag) && drag.to === i;
+  const inDrag = (i: number) => drag != null && i >= drag.from && i < drag.from + span(drag.from);
+  /** Where the arrow keys send row i: before the block above it, or after the block below it. */
+  const keyTarget = (i: number, key: string) => {
+    if (key === 'ArrowUp') {
+      let j = i - 1;
+      while (j > 0 && depth(j) > depth(i)) j--;
+      return j;
+    }
+    if (key === 'ArrowDown') {
+      const k = i + span(i);
+      if (k >= items.length) return null;
+      return depth(k) === depth(i) ? k + span(k) : k + 1;
+    }
+    return undefined;
+  };
 
   return {
     grip: (i: number, label: string) => ({
@@ -32,15 +57,15 @@ export function useDragReorder<T>(items: T[], onReorder: (items: T[]) => void) {
       onPointerDown: () => setArmed(i),
       onPointerUp: () => setArmed(null),
       onKeyDown: (e: KeyboardEvent) => {
-        const to = e.key === 'ArrowUp' ? i - 1 : e.key === 'ArrowDown' ? i + 2 : null;
-        if (to == null) return;
+        const to = keyTarget(i, e.key);
+        if (to === undefined) return;
         e.preventDefault();
-        if (to >= 0 && to <= items.length) onReorder(moveTo(items, i, to));
+        if (to != null && to >= 0 && to <= items.length) onReorder(moveTo(items, i, to, span(i)));
       },
     }),
     row: (i: number, label: string) => ({
       draggable: armed === i,
-      className: [drag?.from === i && 'dragging', dropAt(i) && 'drop-before', i === items.length - 1 && dropAt(i + 1) && 'drop-after'].filter(Boolean).join(' ') || undefined,
+      className: [inDrag(i) && 'dragging', dropAt(i) && 'drop-before', i === items.length - 1 && dropAt(i + 1) && 'drop-after'].filter(Boolean).join(' ') || undefined,
       onDragStart: (e: DragEvent) => {
         e.stopPropagation();
         e.dataTransfer.effectAllowed = 'move';
@@ -59,7 +84,7 @@ export function useDragReorder<T>(items: T[], onReorder: (items: T[]) => void) {
         if (!drag) return;
         e.preventDefault();
         e.stopPropagation();
-        if (moves(drag)) onReorder(moveTo(items, drag.from, drag.to));
+        if (moves(drag)) onReorder(moveTo(items, drag.from, drag.to, span(drag.from)));
       },
       onDragEnd: (e: DragEvent) => {
         e.stopPropagation();

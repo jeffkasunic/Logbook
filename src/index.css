@@ -1283,7 +1283,12 @@ div.plan-item {
   .project-task-btn {
     opacity: 0;
   }
+  .project-tasks > li > .grip {
+    opacity: 0;
+  }
   .project-tasks li:hover .project-task-btn,
+  .project-tasks li:hover > .grip,
+  .project-tasks > li > .grip:focus-visible,
   .project-task-btn:focus-visible {
     opacity: 1;
   }

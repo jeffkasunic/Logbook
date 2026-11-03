@@ -5,6 +5,7 @@ import { seriesVar } from '../lib/colors';
 import { todayISO } from '../lib/dates';
 import { projectGroups } from '../lib/projects';
 import { Linkify } from './Linkify';
+import { SortableList } from './Sortable';
 
 /**
  * The Projects tab: this quarter's projects down the side, and the selected one's page with its description, tasks
@@ -103,7 +104,8 @@ const uid = () => Math.random().toString(36).slice(2, 9);
 
 /**
  * The project's to-dos as a checklist. A new task opens for typing, and Enter starts another below it at the same
- * indent; Enter on an empty task stops. Clearing a task's text removes it.
+ * indent; Enter on an empty task stops. Clearing a task's text removes it. Drag a task by its grip to reorder;
+ * its sub-tasks (the indented tasks below it) come along.
  */
 function Tasks({ tasks, onChange }: { tasks: ProjectTask[]; onChange: (tasks: ProjectTask[]) => void }) {
   const update = (id: string, t: Partial<ProjectTask>) => onChange(tasks.map((x) => (x.id === id ? { ...x, ...t } : x)));
@@ -128,9 +130,16 @@ function Tasks({ tasks, onChange }: { tasks: ProjectTask[]; onChange: (tasks: Pr
           +
         </button>
       </h3>
-      <ul className="checklist project-tasks">
-        {tasks.map((t) => (
-          <li key={t.id} className={[t.done && 'is-done', t.indent && 'is-indented'].filter(Boolean).join(' ') || undefined}>
+      <SortableList
+        className="checklist project-tasks"
+        items={tasks}
+        onReorder={onChange}
+        itemKey={(t) => t.id}
+        itemLabel={(t) => t.text}
+        itemLevel={(t) => (t.indent ? 1 : 0)}
+        itemClass={(t) => [t.done && 'is-done', t.indent && 'is-indented'].filter(Boolean).join(' ') || undefined}
+        renderItem={(t) => (
+          <>
             <input type="checkbox" checked={t.done} aria-label={`Done: ${t.text}`} onChange={(e) => update(t.id, { done: e.target.checked })} />
             <input
               className="line-input"
@@ -141,7 +150,12 @@ function Tasks({ tasks, onChange }: { tasks: ProjectTask[]; onChange: (tasks: Pr
                 if (e.key !== 'Enter') return;
                 const v = e.currentTarget.value.trim();
                 if (!v) return e.currentTarget.blur();
-                const next = { id: uid(), text: '', done: false, indent: t.indent };
+                const next = {
+                  id: uid(),
+                  text: '',
+                  done: false,
+                  indent: t.indent,
+                };
                 const i = tasks.findIndex((x) => x.id === t.id);
                 setAdded(next.id);
                 onChange([...tasks.slice(0, i), { ...t, text: v }, next, ...tasks.slice(i + 1)]);
@@ -166,9 +180,9 @@ function Tasks({ tasks, onChange }: { tasks: ProjectTask[]; onChange: (tasks: Pr
             <button type="button" className="btn btn-icon btn-quiet project-task-btn" aria-label={`Remove “${t.text}”`} title="Remove" onClick={() => remove(t.id)}>
               ×
             </button>
-          </li>
-        ))}
-      </ul>
+          </>
+        )}
+      />
     </section>
   );
 }
