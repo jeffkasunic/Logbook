@@ -7,6 +7,8 @@ import { projectGroups } from '../lib/projects';
 import { Linkify } from './Linkify';
 import { SortableList } from './Sortable';
 
+const CATEGORY = 'category:';
+
 /**
  * The Projects tab: this quarter's projects down the side, and the selected one's page with its description, tasks
  * and notes. Projects from other quarters are listed too once they have a page.
@@ -22,9 +24,13 @@ export function ProjectsView({ selected, onSelect, onEdit }: { selected: string 
     .flatMap((x) => x.projects.filter((p) => details[p.id] && !here.has(p.id)).map((p) => ({ p, q: x })))
     .filter((e, i, all) => all.findIndex((o) => o.p.id === e.p.id) === i);
 
+  // A category's name can be selected too, as "category:<key>", to show all of its projects at once.
+  const groups = projectGroups(q);
+  const category = selected?.startsWith(CATEGORY) ? groups.find((g) => g.key === selected.slice(CATEGORY.length)) : undefined;
+
   const inQuarter = q.projects.find((p) => p.id === selected);
   const found = inQuarter ? { p: inQuarter, q } : elsewhere.find((e) => e.p.id === selected);
-  const current = found ?? (q.projects.length ? { p: projectGroups(q)[0].items[0], q } : elsewhere[0]);
+  const current = found ?? (q.projects.length ? { p: category?.items[0] ?? groups[0].items[0], q } : elsewhere[0]);
 
   if (!current) {
     return (
@@ -37,12 +43,22 @@ export function ProjectsView({ selected, onSelect, onEdit }: { selected: string 
     );
   }
 
+  // A top-level project's sub-projects are the indented ones listed right after it in its category.
+  const subProjects = (() => {
+    if (category) return category.items.slice(1);
+    if (current.q !== q || current.p.indent) return [];
+    const items = groups.find((g) => g.items.some((p) => p.id === current.p.id))?.items ?? [];
+    const after = items.slice(items.findIndex((p) => p.id === current.p.id) + 1);
+    const end = after.findIndex((p) => !p.indent);
+    return end < 0 ? after : after.slice(0, end);
+  })();
+
   const item = (p: Project, color?: string, sub?: string) => (
     <li key={p.id} className={p.indent && !sub ? 'is-indented' : undefined}>
       <button
         type="button"
-        className={['projects-nav-btn', p.id === current.p.id && 'is-active', p.done && 'is-done'].filter(Boolean).join(' ')}
-        aria-current={p.id === current.p.id ? 'page' : undefined}
+        className={['projects-nav-btn', !category && p.id === current.p.id && 'is-active', p.done && 'is-done'].filter(Boolean).join(' ')}
+        aria-current={!category && p.id === current.p.id ? 'page' : undefined}
         onClick={() => onSelect(p.id)}
       >
         {color && <span className="swatch" style={{ background: color }} aria-hidden />}
@@ -55,9 +71,19 @@ export function ProjectsView({ selected, onSelect, onEdit }: { selected: string 
   return (
     <div className="projects">
       <nav className="panel projects-nav" aria-label="Projects">
-        {projectGroups(q).map((g) => (
+        {groups.map((g) => (
           <div key={g.key} className="plan-group">
-            <h3 className="project-cat-title">{g.title}</h3>
+            <h3 className="project-cat-title">
+              <button
+                type="button"
+                className={['projects-cat-btn', g === category && 'is-active'].filter(Boolean).join(' ')}
+                aria-current={g === category ? 'page' : undefined}
+                title={`Show all ${g.title} projects`}
+                onClick={() => onSelect(CATEGORY + g.key)}
+              >
+                {g.title}
+              </button>
+            </h3>
             <ul className="projects-nav-list">{g.items.map((p) => item(p, g.color))}</ul>
           </div>
         ))}
@@ -68,19 +94,24 @@ export function ProjectsView({ selected, onSelect, onEdit }: { selected: string 
           </div>
         )}
       </nav>
-      <ProjectPage key={current.p.id} project={current.p} quarter={current.q} details={details[current.p.id] ?? {}} />
+      <div className="projects-pages">
+        <ProjectPage key={current.p.id} project={current.p} quarter={current.q} details={details[current.p.id] ?? {}} sub={!!category && !!current.p.indent} />
+        {subProjects.map((p) => (
+          <ProjectPage key={p.id} project={p} quarter={q} details={details[p.id] ?? {}} sub={!category || !!p.indent} />
+        ))}
+      </div>
     </div>
   );
 }
 
-function ProjectPage({ project: p, quarter: q, details: d }: { project: Project; quarter: Quarter; details: ProjectDetails }) {
+function ProjectPage({ project: p, quarter: q, details: d, sub = false }: { project: Project; quarter: Quarter; details: ProjectDetails; sub?: boolean }) {
   const { dispatch } = useStore();
   const set = (patch: Partial<ProjectDetails>) => dispatch({ type: 'setProjectDetails', projectId: p.id, patch });
 
   const catIndex = q.categories.findIndex((c) => c.id === p.categoryId);
 
   return (
-    <article className="panel project-page">
+    <article className={['panel project-page', sub && 'is-sub'].filter(Boolean).join(' ')} aria-label={p.text}>
       <h2 className="project-page-title">
         <span className={p.done ? 'is-done' : undefined}>{p.text}</span>
         <span className="count">

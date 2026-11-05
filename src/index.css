@@ -1257,6 +1257,30 @@ div.plan-item {
   flex-wrap: wrap;
   font-size: 1.5rem;
 }
+.projects-cat-btn {
+  padding: 0.1rem 0.5rem;
+  margin-left: -0.5rem;
+  border: 0;
+  border-radius: var(--radius-sm);
+  background: transparent;
+  color: inherit;
+  font: inherit;
+  cursor: pointer;
+}
+.projects-cat-btn:hover {
+  background: var(--surface-2);
+}
+.projects-cat-btn.is-active {
+  background: var(--accent-soft);
+}
+.projects-pages {
+  display: grid;
+  gap: 1.25rem;
+  min-width: 0;
+}
+.project-page.is-sub .project-page-title {
+  font-size: 1.2rem;
+}
 .project-page-title .count {
   display: inline-flex;
   align-items: center;
