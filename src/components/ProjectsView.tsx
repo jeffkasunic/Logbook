@@ -95,6 +95,15 @@ export function ProjectsView({ selected, onSelect, onEdit }: { selected: string 
         )}
       </nav>
       <div className="projects-pages">
+        {category && (
+          <h2 className="project-page-title projects-cat-heading">
+            {category.color && <span className="swatch" style={{ background: category.color }} aria-hidden />}
+            {category.title}
+            <span className="count">
+              {category.items.length} {category.items.length === 1 ? 'project' : 'projects'} · Q{q.quarter} {q.year}
+            </span>
+          </h2>
+        )}
         <ProjectPage key={current.p.id} project={current.p} quarter={current.q} details={details[current.p.id] ?? {}} sub={!!category && !!current.p.indent} />
         {subProjects.map((p) => (
           <ProjectPage key={p.id} project={p} quarter={q} details={details[p.id] ?? {}} sub={!category || !!p.indent} />
@@ -109,6 +118,21 @@ function ProjectPage({ project: p, quarter: q, details: d, sub = false }: { proj
   const set = (patch: Partial<ProjectDetails>) => dispatch({ type: 'setProjectDetails', projectId: p.id, patch });
 
   const catIndex = q.categories.findIndex((c) => c.id === p.categoryId);
+
+  // The task or note just added, which opens for typing. Empty sections are hidden; their add buttons sit in a row.
+  const [added, setAdded] = useState<string | null>(null);
+  const tasks = d.tasks ?? [];
+  const notes = d.notes ?? [];
+  const addTask = () => {
+    const t = { id: uid(), text: '', done: false };
+    setAdded(t.id);
+    set({ tasks: [...tasks, t] });
+  };
+  const addNote = () => {
+    const n = { id: uid(), date: todayISO(), text: '' };
+    setAdded(n.id);
+    set({ notes: [...notes, n] });
+  };
 
   return (
     <article className={['panel project-page', sub && 'is-sub'].filter(Boolean).join(' ')} aria-label={p.text}>
@@ -125,41 +149,57 @@ function ProjectPage({ project: p, quarter: q, details: d, sub = false }: { proj
         </p>
       )}
       <TextField label="Description" heading={null} value={d.description} rows={4} className="project-description" onSave={(v) => set({ description: v })} />
-      <Tasks tasks={d.tasks ?? []} onChange={(tasks) => set({ tasks })} />
-      <Notes notes={d.notes ?? []} onChange={(notes) => set({ notes })} />
+      {tasks.length > 0 && <Tasks tasks={tasks} added={added} setAdded={setAdded} onAdd={addTask} onChange={(tasks) => set({ tasks })} />}
+      {notes.length > 0 && <Notes notes={notes} added={added} setAdded={setAdded} onAdd={addNote} onChange={(notes) => set({ notes })} />}
+      {(!tasks.length || !notes.length) && (
+        <div className="project-text project-add-row">
+          {!tasks.length && <AddButton label="Task" onClick={addTask} />}
+          {!notes.length && <AddButton label="Note" onClick={addNote} />}
+        </div>
+      )}
     </article>
   );
 }
 
 const uid = () => Math.random().toString(36).slice(2, 9);
 
+function AddButton({ label, onClick }: { label: string; onClick: () => void }) {
+  return (
+    <button type="button" className="btn btn-sm project-add-btn" aria-label={`Add ${label.toLowerCase()}`} title={`Add ${label.toLowerCase()}`} onClick={onClick}>
+      + {label}
+    </button>
+  );
+}
+
+type SectionProps = {
+  added: string | null;
+  setAdded: (id: string | null) => void;
+  onAdd: () => void;
+};
+
 /**
  * The project's to-dos as a checklist. A new task opens for typing, and Enter starts another below it at the same
  * indent; Enter on an empty task stops. Clearing a task's text removes it. Drag a task by its grip to reorder;
- * its sub-tasks (the indented tasks below it) come along.
+ * its sub-tasks (the indented tasks below it) come along. Hidden when there are none.
  */
-function Tasks({ tasks, onChange }: { tasks: ProjectTask[]; onChange: (tasks: ProjectTask[]) => void }) {
+function Tasks({
+  tasks,
+  added,
+  setAdded,
+  onAdd,
+  onChange,
+}: SectionProps & {
+  tasks: ProjectTask[];
+  onChange: (tasks: ProjectTask[]) => void;
+}) {
   const update = (id: string, t: Partial<ProjectTask>) => onChange(tasks.map((x) => (x.id === id ? { ...x, ...t } : x)));
   const remove = (id: string) => onChange(tasks.filter((x) => x.id !== id));
-  const [added, setAdded] = useState<string | null>(null);
 
   return (
     <section className="project-text">
       <h3 className="project-cat-title">
         Tasks
-        <button
-          type="button"
-          className="btn btn-sm project-notes-add"
-          aria-label="Add task"
-          title="Add task"
-          onClick={() => {
-            const t = { id: uid(), text: '', done: false };
-            setAdded(t.id);
-            onChange([...tasks, t]);
-          }}
-        >
-          +
-        </button>
+        <AddButton label="Task" onClick={onAdd} />
       </h3>
       <SortableList
         className="checklist project-tasks"
@@ -218,9 +258,17 @@ function Tasks({ tasks, onChange }: { tasks: ProjectTask[]; onChange: (tasks: Pr
   );
 }
 
-/** The project's notes, oldest first. A new note opens for typing, and one left empty goes away. */
-function Notes({ notes, onChange }: { notes: ProjectNote[]; onChange: (notes: ProjectNote[]) => void }) {
-  const [added, setAdded] = useState<string | null>(null);
+/** The project's notes, oldest first. A new note opens for typing, and one left empty goes away. Hidden when there are none. */
+function Notes({
+  notes,
+  added,
+  setAdded,
+  onAdd,
+  onChange,
+}: SectionProps & {
+  notes: ProjectNote[];
+  onChange: (notes: ProjectNote[]) => void;
+}) {
   const update = (id: string, text: string) => onChange(notes.map((n) => (n.id === id ? { ...n, text } : n)));
   const remove = (id: string) => onChange(notes.filter((n) => n.id !== id));
 
@@ -228,19 +276,7 @@ function Notes({ notes, onChange }: { notes: ProjectNote[]; onChange: (notes: Pr
     <section className="project-text">
       <h3 className="project-cat-title">
         Notes
-        <button
-          type="button"
-          className="btn btn-sm project-notes-add"
-          aria-label="Add note"
-          title="Add note"
-          onClick={() => {
-            const n = { id: uid(), date: todayISO(), text: '' };
-            setAdded(n.id);
-            onChange([...notes, n]);
-          }}
-        >
-          +
-        </button>
+        <AddButton label="Note" onClick={onAdd} />
       </h3>
       <ol className="project-notes">
         {notes.map((n) => (
@@ -317,11 +353,7 @@ function TextField({
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [draft]);
 
-  const add = draft === null && !value && (
-    <button type="button" className="btn btn-sm project-notes-add" aria-label={`Add ${label.toLowerCase()}`} title={`Add ${label.toLowerCase()}`} onClick={() => setDraft('')}>
-      +
-    </button>
-  );
+  const add = draft === null && !value && <AddButton label={label} onClick={() => setDraft('')} />;
 
   return (
     <div className={['project-text', className].filter(Boolean).join(' ')}>

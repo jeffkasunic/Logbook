@@ -1273,6 +1273,17 @@ div.plan-item {
 .projects-cat-btn.is-active {
   background: var(--accent-soft);
 }
+.projects-cat-heading {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  margin: 0;
+  font-size: 1.75rem;
+}
+.projects-cat-heading .swatch {
+  width: 0.85rem;
+  height: 0.85rem;
+}
 .projects-pages {
   display: grid;
   gap: 1.25rem;
@@ -1316,12 +1327,6 @@ div.plan-item {
   .project-task-btn:focus-visible {
     opacity: 1;
   }
-}
-.project-notes-add {
-  min-width: 28px;
-  margin-left: auto;
-  font-size: 1.05rem;
-  line-height: 1;
 }
 .project-notes {
   list-style: none;
@@ -1373,6 +1378,18 @@ div.plan-item {
 }
 .project-textarea:focus {
   outline: none;
+}
+.project-add-btn {
+  margin-left: auto;
+  white-space: nowrap;
+}
+.project-add-row {
+  display: flex;
+  justify-content: flex-end;
+  gap: 0.4rem;
+}
+.project-add-row .project-add-btn {
+  margin-left: 0;
 }
 .project-text-add {
   display: flex;
