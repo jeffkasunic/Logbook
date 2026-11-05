@@ -1209,7 +1209,7 @@ div.plan-item {
 }
 
 /* ------------------------------------------------------------------ projects (one project's page) */
-.projects {
+.projects-layout {
   display: grid;
   grid-template-columns: minmax(220px, 300px) minmax(0, 1fr);
   gap: 1.25rem;
@@ -1869,7 +1869,7 @@ div.plan-item {
     padding-right: 16px;
   }
   .setup,
-  .projects {
+  .projects-layout {
     grid-template-columns: 1fr;
   }
   .stats {

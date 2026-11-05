@@ -69,7 +69,7 @@ export function ProjectsView({ selected, onSelect, onEdit }: { selected: string 
   );
 
   return (
-    <div className="projects">
+    <div className="projects-layout">
       <nav className="panel projects-nav" aria-label="Projects">
         {groups.map((g) => (
           <div key={g.key} className="plan-group">
