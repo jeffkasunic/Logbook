@@ -1,7 +1,7 @@
+// The planning boxes on the Projects tab: core focus, the reading list and the user's own sections.
 import { Fragment, useRef, useState, type CSSProperties, type ReactNode } from 'react';
 import { useStore } from '../store';
-import type { Project, Quarter, ReadingItem } from '../types';
-import { confirmRemoveProject, projectGroups as groupProjects } from '../lib/projects';
+import type { Quarter, ReadingItem } from '../types';
 import { NEXT_STATUS, readingCategories, STATUS_LABEL } from '../lib/reading';
 import { setNote } from '../lib/notes';
 import { arrangeColumns, useColumnCount } from '../lib/useColumns';
@@ -9,12 +9,39 @@ import { useDragColumns } from '../lib/useDragReorder';
 import { Linkify } from './Linkify';
 import { Grip } from './Sortable';
 
-/** The quarter's core focus across the top, then its projects, reading list and the user's own sections as checklists, in columns the user arranges by dragging. Edit the lists themselves on the Edit tab. */
-export function PlanView({ onEdit, onOpenProject }: { onEdit: () => void; onOpenProject: (id: string) => void }) {
-  const { state, quarter: q, dispatch } = useStore();
-  const patch = (p: Partial<Omit<Quarter, 'id'>>) => dispatch({ type: 'updateQuarter', quarterId: q.id, patch: p });
+/** The quarter's core focus lines, each with its note. */
+export function CoreFocus({ onEdit }: { onEdit: () => void }) {
+  const { quarter: q, dispatch } = useStore();
+  return (
+    <section className="panel plan-core">
+      <h2>Core focus</h2>
+      {q.core.length > 0 ? (
+        <ul className="plan-core-lines">
+          {q.core.map((l, i) => (
+            <CoreLine
+              key={`${i}-${l}`}
+              line={l}
+              note={q.coreNotes?.[l]}
+              onNoteChange={(n) => dispatch({ type: 'updateQuarter', quarterId: q.id, patch: { coreNotes: setNote(q.coreNotes, l, n) } })}
+            />
+          ))}
+        </ul>
+      ) : (
+        <p className="muted">
+          No focus set for this quarter.{' '}
+          <button type="button" className="link-btn" onClick={onEdit}>
+            Add it on the Edit tab
+          </button>
+        </p>
+      )}
+    </section>
+  );
+}
 
-  const projectGroups = groupProjects(q);
+/** The reading list by category; clicking a book's pill steps its status. */
+export function ReadingBox({ onEdit }: { onEdit: () => void }) {
+  const { quarter: q, dispatch } = useStore();
+  const patch = (p: Partial<Omit<Quarter, 'id'>>) => dispatch({ type: 'updateQuarter', quarterId: q.id, patch: p });
 
   const readingCats = readingCategories(q);
   const knownReading = new Set(readingCats.map((c) => c.id));
@@ -22,9 +49,30 @@ export function PlanView({ onEdit, onOpenProject }: { onEdit: () => void; onOpen
     ...readingCats.map((c) => ({ key: c.id, title: c.name, books: q.reading.filter((r) => r.kind === c.id) })),
     { key: 'unsorted', title: 'Unsorted', books: q.reading.filter((r) => !r.kind || !knownReading.has(r.kind)) },
   ];
+    const stepBook = (id: string) => patch({ reading: q.reading.map((r) => (r.id === id ? { ...r, status: NEXT_STATUS[r.status] } : r)) });
+  const removeBook = (id: string) => patch({ reading: q.reading.filter((r) => r.id !== id) });
 
-  const toggleProject = (id: string, done: boolean) => patch({ projects: q.projects.map((p) => (p.id === id ? { ...p, done } : p)) });
-  const setProjectNote = (id: string, note: string) => patch({ projects: q.projects.map((p) => (p.id === id ? { ...p, note: note || undefined } : p)) });
+  return (
+    <PlanPanel title="Reading list" done={q.reading.filter((r) => r.status === 'done').length} total={q.reading.length} empty="No books yet." onEdit={onEdit}>
+      {readingGroups.map(
+        (g) =>
+          g.books.length > 0 && (
+            <PlanGroup key={g.key} title={g.title}>
+              {g.books.map((r) => (
+                <BookItem key={r.id} book={r} onStep={() => stepBook(r.id)} onRemove={() => removeBook(r.id)} />
+              ))}
+            </PlanGroup>
+          ),
+      )}
+    </PlanPanel>
+  );
+}
+
+/** The user's own sections as checklists, in columns the user arranges by dragging. */
+export function PlanBoxes({ onEdit }: { onEdit: () => void }) {
+  const { quarter: q, dispatch } = useStore();
+  const patch = (p: Partial<Omit<Quarter, 'id'>>) => dispatch({ type: 'updateQuarter', quarterId: q.id, patch: p });
+
   const toggleItem = (sectionId: string, itemId: string, done: boolean) =>
     patch({
       sections: q.sections?.map((sec) => (sec.id !== sectionId ? sec : { ...sec, items: sec.items.map((it) => (it.id === itemId ? { ...it, done } : it)) })),
@@ -33,62 +81,11 @@ export function PlanView({ onEdit, onOpenProject }: { onEdit: () => void; onOpen
     patch({
       sections: q.sections?.map((sec) => (sec.id !== sectionId ? sec : { ...sec, items: sec.items.map((it) => (it.id === itemId ? { ...it, note: note || undefined } : it)) })),
     });
-  const setBookNote = (id: string, note: string) => patch({ reading: q.reading.map((r) => (r.id === id ? { ...r, note: note || undefined } : r)) });
-  const stepBook = (id: string) => patch({ reading: q.reading.map((r) => (r.id === id ? { ...r, status: NEXT_STATUS[r.status] } : r)) });
-
-  const removeProject = (p: Project) => confirmRemoveProject(state, q.id, p) && patch({ projects: q.projects.filter((x) => x.id !== p.id) });
   const removeItem = (sectionId: string, itemId: string) =>
     patch({ sections: q.sections?.map((sec) => (sec.id !== sectionId ? sec : { ...sec, items: sec.items.filter((it) => it.id !== itemId) })) });
-  const removeBook = (id: string) => patch({ reading: q.reading.filter((r) => r.id !== id) });
   const [grid, colCount] = useColumnCount<HTMLDivElement>(300);
 
-  const panels: { id: string; label: string; render: (box: PanelBox, grip: ReactNode) => ReactNode }[] = [
-    {
-      id: 'projects',
-      label: `${q.year} projects`,
-      render: (box, grip) => (
-        <PlanPanel box={box} grip={grip} title={`${q.year} projects`} done={q.projects.filter((p) => p.done).length} total={q.projects.length} empty="No projects yet." onEdit={onEdit}>
-          {projectGroups.map((g) => (
-            <PlanGroup key={g.key} title={g.title} color={g.color}>
-              {g.items.map((p) => (
-                <CheckItem
-                  key={p.id}
-                  label={p.text}
-                  note={p.note}
-                  checked={p.done}
-                  indent={p.indent}
-                  onChange={(v) => toggleProject(p.id, v)}
-                  onNoteChange={(n) => setProjectNote(p.id, n)}
-                  onOpen={() => onOpenProject(p.id)}
-                  onRemove={() => removeProject(p)}
-                />
-              ))}
-            </PlanGroup>
-          ))}
-        </PlanPanel>
-      ),
-    },
-    {
-      id: 'reading',
-      label: 'Reading list',
-      render: (box, grip) => (
-        <PlanPanel box={box} grip={grip} title="Reading list" done={q.reading.filter((r) => r.status === 'done').length} total={q.reading.length} empty="No books yet." onEdit={onEdit}>
-          {readingGroups.map((g) => {
-            const books = g.books;
-            return (
-              books.length > 0 && (
-                <PlanGroup key={g.key} title={g.title}>
-                  {books.map((r) => (
-                    <BookItem key={r.id} book={r} onStep={() => stepBook(r.id)} onNoteChange={(n) => setBookNote(r.id, n)} onRemove={() => removeBook(r.id)} />
-                  ))}
-                </PlanGroup>
-              )
-            );
-          })}
-        </PlanPanel>
-      ),
-    },
-    ...(q.sections ?? []).map((sec) => ({
+  const panels: { id: string; label: string; render: (box: PanelBox, grip: ReactNode) => ReactNode }[] = (q.sections ?? []).map((sec) => ({
       id: sec.id,
       label: sec.title,
       render: (box: PanelBox, grip: ReactNode) => (
@@ -100,31 +97,13 @@ export function PlanView({ onEdit, onOpenProject }: { onEdit: () => void; onOpen
           </ul>
         </PlanPanel>
       ),
-    })),
-  ];
+    }));
   const byId = new Map(panels.map((p) => [p.id, p]));
   const cols = arrangeColumns(q.planLayout, panels.map((p) => p.id), colCount);
   const drag = useDragColumns(cols, (planLayout) => patch({ planLayout }));
 
   return (
     <div className="plan" ref={grid} style={{ '--plan-cols': colCount } as CSSProperties}>
-      <section className="panel plan-core">
-        <h2>Core focus</h2>
-        {q.core.length > 0 ? (
-          <ul className="plan-core-lines">
-            {q.core.map((l, i) => (
-              <CoreLine key={`${i}-${l}`} line={l} note={q.coreNotes?.[l]} onNoteChange={(n) => patch({ coreNotes: setNote(q.coreNotes, l, n) })} />
-            ))}
-          </ul>
-        ) : (
-          <p className="muted">
-            No focus set for this quarter.{' '}
-            <button type="button" className="link-btn" onClick={onEdit}>
-              Add it on the Edit tab
-            </button>
-          </p>
-        )}
-      </section>
       {cols.map((col, j) => (
         <div key={j} {...drag.column(j)} className={['plan-col', drag.column(j).className].filter(Boolean).join(' ')}>
           {col.map((id) => {
@@ -139,9 +118,9 @@ export function PlanView({ onEdit, onOpenProject }: { onEdit: () => void; onOpen
 
 type PanelBox = ReturnType<ReturnType<typeof useDragColumns>['panel']>;
 
-function PlanPanel({ box, grip, title, done, total, empty, onEdit, children }: { box: PanelBox; grip: ReactNode; title: string; done: number; total: number; empty: string; onEdit: () => void; children: ReactNode }) {
+function PlanPanel({ box, grip, title, done, total, empty, onEdit, children }: { box?: PanelBox; grip?: ReactNode; title: string; done: number; total: number; empty: string; onEdit: () => void; children: ReactNode }) {
   return (
-    <section {...box} className={['panel plan-panel', box.className].filter(Boolean).join(' ')}>
+    <section {...box} className={['panel plan-panel', box?.className].filter(Boolean).join(' ')}>
       <h2>
         {grip}
         {title}
@@ -192,9 +171,8 @@ function CoreLine({ line, note, onNoteChange }: { line: string; note?: string; o
   );
 }
 
-/** A book with its status pill; clicking the pill steps To read → Reading → Read. */
-function BookItem({ book: r, onStep, onNoteChange, onRemove }: { book: ReadingItem; onStep: () => void; onNoteChange: (note: string) => void; onRemove: () => void }) {
-  const [editing, setEditing] = useState(false);
+/** A book with its status pill and note; clicking the pill steps To read → Reading → Read. Notes are edited on the Edit tab. */
+function BookItem({ book: r, onStep, onRemove }: { book: ReadingItem; onStep: () => void; onRemove: () => void }) {
   return (
     <li className={r.status === 'done' ? 'is-done' : undefined}>
       <div className="plan-item">
@@ -203,10 +181,9 @@ function BookItem({ book: r, onStep, onNoteChange, onRemove }: { book: ReadingIt
         </button>
         <span className="plan-item-text">
           {r.title}
-          <PlanNote note={r.note} label={r.title} editing={editing} onSave={onNoteChange} onDone={() => setEditing(false)} />
+          <PlanNote note={r.note} label={r.title} editing={false} onDone={() => {}} />
         </span>
       </div>
-      <NoteButton label={r.title} hasNote={!!r.note} onClick={() => setEditing(true)} />
       <RemoveButton label={r.title} onClick={onRemove} />
     </li>
   );
@@ -219,7 +196,6 @@ function CheckItem({
   indent,
   onChange,
   onNoteChange,
-  onOpen,
   onRemove,
 }: {
   label: string;
@@ -229,8 +205,6 @@ function CheckItem({
   onChange: (v: boolean) => void;
   /** Set to let the note be added or edited here; otherwise the note only shows. */
   onNoteChange?: (note: string) => void;
-  /** Set to offer a link to the item's page (projects on the Projects tab). */
-  onOpen?: () => void;
   onRemove: () => void;
 }) {
   const [editing, setEditing] = useState(false);
@@ -244,18 +218,13 @@ function CheckItem({
         </span>
       </label>
       {onNoteChange && <NoteButton label={label} hasNote={!!note} onClick={() => setEditing(true)} />}
-      {onOpen && (
-        <button type="button" className="btn btn-icon btn-quiet plan-open-btn" aria-label={`Open the page for “${label}”`} title="Open project page" onClick={onOpen}>
-          ↗
-        </button>
-      )}
       <RemoveButton label={label} onClick={onRemove} />
     </li>
   );
 }
 
 /** An item's note with its links, or a box to edit it. Enter or leaving the box saves; Esc cancels. */
-function PlanNote({ note, label, editing, onSave, onDone }: { note?: string; label: string; editing: boolean; onSave?: (note: string) => void; onDone: () => void }) {
+export function PlanNote({ note, label, editing, onSave, onDone }: { note?: string; label: string; editing: boolean; onSave?: (note: string) => void; onDone: () => void }) {
   const cancelled = useRef(false);
   if (editing && onSave)
     return (
@@ -287,7 +256,7 @@ function PlanNote({ note, label, editing, onSave, onDone }: { note?: string; lab
   ) : null;
 }
 
-function NoteButton({ label, hasNote, onClick }: { label: string; hasNote: boolean; onClick: () => void }) {
+export function NoteButton({ label, hasNote, onClick }: { label: string; hasNote: boolean; onClick: () => void }) {
   return (
     <button type="button" className="btn btn-icon btn-quiet plan-note-btn" aria-label={`${hasNote ? 'Edit' : 'Add'} note on “${label}”`} title={hasNote ? 'Edit note' : 'Add note'} onClick={onClick}>
       ✎
@@ -296,7 +265,7 @@ function NoteButton({ label, hasNote, onClick }: { label: string; hasNote: boole
 }
 
 /** Deletes the item outright (same as × on the Edit tab). Shown on hover or focus where there's a pointer, always on touch. */
-function RemoveButton({ label, onClick }: { label: string; onClick: () => void }) {
+export function RemoveButton({ label, onClick }: { label: string; onClick: () => void }) {
   return (
     <button type="button" className="btn btn-icon btn-quiet plan-remove" aria-label={`Remove “${label}”`} title="Remove" onClick={onClick}>
       ×

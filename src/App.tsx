@@ -5,15 +5,13 @@ import { currentStreak } from './lib/calc';
 import { DailyLog } from './components/DailyLog';
 import { WeeklySummary } from './components/WeeklySummary';
 import { SetupView } from './components/SetupView';
-import { PlanView } from './components/PlanView';
 import { ProjectsView } from './components/ProjectsView';
 import { SettingsView } from './components/SettingsView';
 
-type Tab = 'log' | 'weeks' | 'plan' | 'projects' | 'setup' | 'settings';
+type Tab = 'log' | 'weeks' | 'projects' | 'setup' | 'settings';
 const TABS: { id: Tab; label: string }[] = [
   { id: 'log', label: 'Daily log' },
   { id: 'weeks', label: 'Quarter' },
-  { id: 'plan', label: 'Plan' },
   { id: 'projects', label: 'Projects' },
   { id: 'setup', label: 'Edit' },
   { id: 'settings', label: 'Settings' },
@@ -32,7 +30,9 @@ function readGuestTipClosed(): boolean {
 
 function readTab(): Tab {
   try {
-    const t = localStorage.getItem(TAB_KEY) as Tab | null;
+    const saved = localStorage.getItem(TAB_KEY);
+    // The Plan tab was folded into Projects.
+    const t = (saved === 'plan' ? 'projects' : saved) as Tab | null;
     if (t && TABS.some((x) => x.id === t)) return t;
   } catch {
     /* ignore */
@@ -177,7 +177,7 @@ export default function App() {
             to see it filled in.
           </p>
         )}
-        {(tab === 'log' || tab === 'weeks' || tab === 'plan' || tab === 'projects') && (
+        {(tab === 'log' || tab === 'weeks' || tab === 'projects') && (
           <h2 className="page-title">
             {TABS.find((t) => t.id === tab)?.label}{' '}
             <span className="count">
@@ -192,15 +192,6 @@ export default function App() {
             onOpenDay={(d) => {
               selectDay(d);
               setTab('log');
-            }}
-          />
-        )}
-        {tab === 'plan' && (
-          <PlanView
-            onEdit={() => setTab('setup')}
-            onOpenProject={(id) => {
-              setProjectId(id);
-              setTab('projects');
             }}
           />
         )}

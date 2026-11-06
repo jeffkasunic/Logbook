@@ -23,7 +23,7 @@ function uniqueId(base: string, taken: string[]) {
   return id;
 }
 
-/** The Edit tab: what the daily log tracks (categories, measures) and what the Plan tab shows (focus, projects, reading). Quarters and backups are on Settings. */
+/** The Edit tab: what the daily log tracks (categories, measures) and what the Projects tab shows (focus, projects, reading, own sections). Quarters and backups are on Settings. */
 export function SetupView() {
   const { state, quarter: q, dispatch } = useStore();
 
@@ -233,9 +233,9 @@ export function SetupView() {
         </div>
       </section>
 
-      <section className="setup-group" aria-labelledby="edit-plan">
-        <h2 id="edit-plan" className="setup-group-title">
-          Plan <span className="count">what the Plan tab shows</span>
+      <section className="setup-group" aria-labelledby="edit-projects">
+        <h2 id="edit-projects" className="setup-group-title">
+          Projects <span className="count">what the Projects tab shows</span>
         </h2>
         <div className="setup" ref={planGrid}>
           <section className="panel setup-wide">

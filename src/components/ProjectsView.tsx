@@ -3,17 +3,38 @@ import { useStore } from '../store';
 import type { Project, ProjectDetails, ProjectNote, ProjectTask, Quarter } from '../types';
 import { seriesVar } from '../lib/colors';
 import { todayISO } from '../lib/dates';
-import { projectGroups } from '../lib/projects';
+import { confirmRemoveProject, projectGroups } from '../lib/projects';
 import { Linkify } from './Linkify';
+import { CoreFocus, NoteButton, PlanBoxes, PlanNote, ReadingBox, RemoveButton } from './PlanBoxes';
 import { SortableList } from './Sortable';
 
 const CATEGORY = 'category:';
 
 /**
- * The Projects tab: this quarter's projects down the side, and the selected one's page with its description, tasks
- * and notes. Projects from other quarters are listed too once they have a page.
+ * The Projects tab: the quarter's core focus across the top, then its projects, the selected one's page and the
+ * reading list side by side, then a divider and the user's own sections as boxes.
  */
-export function ProjectsView({ selected, onSelect, onEdit }: { selected: string | null; onSelect: (id: string) => void; onEdit: () => void }) {
+export function ProjectsView(props: { selected: string | null; onSelect: (id: string) => void; onEdit: () => void }) {
+  const { quarter: q } = useStore();
+  return (
+    <div className="projects-view">
+      <CoreFocus onEdit={props.onEdit} />
+      <ProjectPages {...props} aside={<ReadingBox onEdit={props.onEdit} />} />
+      {(q.sections?.length ?? 0) > 0 && (
+        <>
+          <hr className="projects-divider" />
+          <PlanBoxes onEdit={props.onEdit} />
+        </>
+      )}
+    </div>
+  );
+}
+
+/**
+ * This quarter's projects down the side, the selected one's page with its description, tasks and notes, and `aside`
+ * in a narrower column on the right. Projects from other quarters are listed too once they have a page.
+ */
+function ProjectPages({ selected, onSelect, onEdit, aside }: { selected: string | null; onSelect: (id: string) => void; onEdit: () => void; aside: ReactNode }) {
   const { state, quarter: q } = useStore();
   const details = state.projectDetails ?? {};
 
@@ -34,12 +55,15 @@ export function ProjectsView({ selected, onSelect, onEdit }: { selected: string 
 
   if (!current) {
     return (
-      <p className="muted">
-        No projects this quarter.{' '}
-        <button type="button" className="link-btn" onClick={onEdit}>
-          Add some on the Edit tab
-        </button>
-      </p>
+      <div className="projects-layout">
+        <p className="muted projects-empty">
+          No projects this quarter.{' '}
+          <button type="button" className="link-btn" onClick={onEdit}>
+            Add some on the Edit tab
+          </button>
+        </p>
+        <div className="plan projects-aside">{aside}</div>
+      </div>
     );
   }
 
@@ -54,18 +78,7 @@ export function ProjectsView({ selected, onSelect, onEdit }: { selected: string 
   })();
 
   const item = (p: Project, color?: string, sub?: string) => (
-    <li key={p.id} className={p.indent && !sub ? 'is-indented' : undefined}>
-      <button
-        type="button"
-        className={['projects-nav-btn', !category && p.id === current.p.id && 'is-active', p.done && 'is-done'].filter(Boolean).join(' ')}
-        aria-current={!category && p.id === current.p.id ? 'page' : undefined}
-        onClick={() => onSelect(p.id)}
-      >
-        {color && <span className="swatch" style={{ background: color }} aria-hidden />}
-        <span className="projects-nav-text">{p.text}</span>
-        {sub && <span className="count">{sub}</span>}
-      </button>
-    </li>
+    <NavItem key={p.id} project={p} color={color} sub={sub} active={!category && p.id === current.p.id} onSelect={() => onSelect(p.id)} />
   );
 
   return (
@@ -109,13 +122,45 @@ export function ProjectsView({ selected, onSelect, onEdit }: { selected: string 
           <ProjectPage key={p.id} project={p} quarter={q} details={details[p.id] ?? {}} sub={!category || !!p.indent} />
         ))}
       </div>
+      <div className="plan projects-aside">{aside}</div>
     </div>
+  );
+}
+
+/** Marks a project done, sets its note, or removes the project from its quarter (asking first when that deletes its page). */
+function useProjectEdits(p: Project, q: Quarter) {
+  const { state, dispatch } = useStore();
+  const patchProjects = (projects: Project[]) => dispatch({ type: 'updateQuarter', quarterId: q.id, patch: { projects } });
+  return {
+    setDone: (done: boolean) => patchProjects(q.projects.map((x) => (x.id === p.id ? { ...x, done } : x))),
+    setNote: (note: string) => patchProjects(q.projects.map((x) => (x.id === p.id ? { ...x, note: note || undefined } : x))),
+    remove: () => confirmRemoveProject(state, q.id, p) && patchProjects(q.projects.filter((x) => x.id !== p.id)),
+  };
+}
+
+/** A project in the side list. */
+function NavItem({ project: p, color, sub, active, onSelect }: { project: Project; color?: string; sub?: string; active: boolean; onSelect: () => void }) {
+  return (
+    <li className={p.indent && !sub ? 'is-indented' : undefined}>
+      <button
+        type="button"
+        className={['projects-nav-btn', active && 'is-active', p.done && 'is-done'].filter(Boolean).join(' ')}
+        aria-current={active ? 'page' : undefined}
+        onClick={onSelect}
+      >
+        {color && <span className="swatch" style={{ background: color }} aria-hidden />}
+        <span className="projects-nav-text">{p.text}</span>
+        {sub && <span className="count">{sub}</span>}
+      </button>
+    </li>
   );
 }
 
 function ProjectPage({ project: p, quarter: q, details: d, sub = false }: { project: Project; quarter: Quarter; details: ProjectDetails; sub?: boolean }) {
   const { dispatch } = useStore();
   const set = (patch: Partial<ProjectDetails>) => dispatch({ type: 'setProjectDetails', projectId: p.id, patch });
+  const edits = useProjectEdits(p, q);
+  const [editingNote, setEditingNote] = useState(false);
 
   const catIndex = q.categories.findIndex((c) => c.id === p.categoryId);
 
@@ -137,16 +182,21 @@ function ProjectPage({ project: p, quarter: q, details: d, sub = false }: { proj
   return (
     <article className={['panel project-page', sub && 'is-sub'].filter(Boolean).join(' ')} aria-label={p.text}>
       <h2 className="project-page-title">
+        <input type="checkbox" className="project-done" checked={p.done} aria-label={`Done: ${p.text}`} title={p.done ? 'Mark not done' : 'Mark done'} onChange={(e) => edits.setDone(e.target.checked)} />
         <span className={p.done ? 'is-done' : undefined}>{p.text}</span>
         <span className="count">
           {catIndex >= 0 && <span className="swatch" style={{ background: seriesVar(catIndex) }} aria-hidden />}
           {catIndex >= 0 ? q.categories[catIndex].name : 'Other'} · Q{q.quarter} {q.year}
         </span>
+        <span className="project-page-actions">
+          <NoteButton label={p.text} hasNote={!!p.note} onClick={() => setEditingNote(true)} />
+          <RemoveButton label={p.text} onClick={edits.remove} />
+        </span>
       </h2>
-      {p.note && (
-        <p className="plan-note">
-          <Linkify text={p.note} />
-        </p>
+      {(p.note || editingNote) && (
+        <div className="project-page-note">
+          <PlanNote note={p.note} label={p.text} editing={editingNote} onSave={edits.setNote} onDone={() => setEditingNote(false)} />
+        </div>
       )}
       <TextField label="Description" heading={null} value={d.description} rows={4} className="project-description" onSave={(v) => set({ description: v })} />
       {tasks.length > 0 && <Tasks tasks={tasks} added={added} setAdded={setAdded} onAdd={addTask} onChange={(tasks) => set({ tasks })} />}

@@ -1,4 +1,4 @@
-// Planning sections shown on the Edit tab: core focus, projects and the reading list.
+// Planning sections shown on the Edit tab: core focus, projects, the reading list and the user's own sections.
 import { Fragment, useState } from 'react';
 import type { Category, PlanSection, Project, ReadingCategory, ReadingItem } from '../types';
 import { seriesVar } from '../lib/colors';
@@ -418,7 +418,7 @@ export function CustomSections({ sections, onChange }: { sections: PlanSection[]
       ))}
       <section className="panel setup-wide">
         <h2>Your own sections</h2>
-        <p className="muted">Add a checklist of your own, like Habits or Trips. Each one gets its own box on the Plan tab.</p>
+        <p className="muted">Add a checklist of your own, like Habits or Trips. Each one gets its own box on the Projects tab.</p>
         <AddInput placeholder="New section, e.g. Habits" onAdd={(title) => onChange([...sections, { id: uid(), title, items: [] }])} />
       </section>
     </>

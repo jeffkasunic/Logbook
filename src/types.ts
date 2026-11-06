@@ -28,7 +28,7 @@ export interface Project {
   done: boolean;
   /** Projects sharing a group number are shown together (blank rows in the sheet). */
   group: number;
-  /** The category the project sits under on the Plan tab; unset or unknown ids show under "Other". */
+  /** The category the project sits under on the Projects tab; unset or unknown ids show under "Other". */
   categoryId?: string;
   /** Shown one step in, under the category's other projects. */
   indent?: boolean;
@@ -58,7 +58,7 @@ export interface ProjectTask {
  */
 export interface ProjectDetails {
   description?: string;
-  /** Shown only on the project's page, not on the Plan tab. */
+  /** Shown on the project's page. */
   tasks?: ProjectTask[];
   /** Oldest first; new notes go at the end. */
   notes?: ProjectNote[];
@@ -81,7 +81,7 @@ export interface ReadingItem {
   kind?: string;
 }
 
-/** A checklist the user adds to the Plan tab, e.g. "Habits" or "Trips". */
+/** A checklist the user adds to the Projects tab, e.g. "Habits" or "Trips". */
 export interface PlanSection {
   id: string;
   title: string;
@@ -108,9 +108,9 @@ export interface Quarter {
   reading: ReadingItem[];
   /** Sections of the reading list; unset means the defaults (Fiction, Non-fiction). */
   readingCategories?: ReadingCategory[];
-  /** User-added checklists shown on the Plan tab after the reading list. */
+  /** User-added checklists shown on the Projects tab after the reading list. */
   sections?: PlanSection[];
-  /** The Plan tab's panels as columns, top to bottom: 'projects', 'reading' and section ids (core focus always sits above them). Panels it doesn't list go in the column with the fewest. */
+  /** The Projects tab's own-section boxes as columns, top to bottom, by section id. Ids it doesn't know (like the retired 'projects' and 'reading') are ignored, and boxes it doesn't list go in the column with the fewest. */
   planLayout?: string[][];
 }
 

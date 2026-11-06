@@ -37,7 +37,7 @@ src/
   lib/calc.ts         totals, weekly sums, stats, hours parsing
   lib/colors.ts       category colours and goal heat steps
   components/         DailyLog, WeeklySummary, WeeklyChart,
-                      QuarterStrip, PlanView, PlanSections, SetupView (Edit tab),
+                      QuarterStrip, ProjectsView, PlanBoxes, PlanSections, SetupView (Edit tab),
                       SettingsView, Sortable, NumCell
 ```
 
