@@ -144,7 +144,8 @@ function quarterItem(userID, quarterId, body) {
   if (!isObject(body) || body.id !== quarterId) throw new HttpError(400, 'quarter id must match the path');
   if (!checkISODate(body.startDate) || !Array.isArray(body.categories)) throw new HttpError(400, 'invalid quarter');
   // Days are stored as their own items; userID and sk always come from the server.
-  const { days: _days, userID: _u, sk: _sk, ...fields } = body;
+  // yearGoals is a retired field, dropped so older clients and backups don't write it back.
+  const { days: _days, userID: _u, sk: _sk, yearGoals: _yearGoals, ...fields } = body;
   return { ...fields, userID, sk: `Q#${quarterId}` };
 }
 

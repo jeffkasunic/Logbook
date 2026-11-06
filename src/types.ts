@@ -89,17 +89,6 @@ export interface PlanSection {
   items: { id: string; text: string; note?: string; done: boolean; indent?: boolean }[];
 }
 
-export interface GoalArea {
-  title: string;
-  items: string[];
-  /** Items checked off on the Plan tab, stored by their text. */
-  done?: string[];
-  /** Items shown one step in, stored by their text. */
-  indented?: string[];
-  /** Notes on items, keyed by their text. */
-  notes?: Record<string, string>;
-}
-
 export interface Quarter {
   /** e.g. "2026-Q4" */
   id: string;
@@ -115,14 +104,13 @@ export interface Quarter {
   core: string[];
   /** Notes on core focus lines, keyed by their text. */
   coreNotes?: Record<string, string>;
-  yearGoals: GoalArea[];
   projects: Project[];
   reading: ReadingItem[];
   /** Sections of the reading list; unset means the defaults (Fiction, Non-fiction). */
   readingCategories?: ReadingCategory[];
   /** User-added checklists shown on the Plan tab after the reading list. */
   sections?: PlanSection[];
-  /** The Plan tab's panels as columns, top to bottom: 'goals', 'projects', 'reading' and section ids (core focus always sits above them). Panels it doesn't list go in the column with the fewest. */
+  /** The Plan tab's panels as columns, top to bottom: 'projects', 'reading' and section ids (core focus always sits above them). Panels it doesn't list go in the column with the fewest. */
   planLayout?: string[][];
 }
 

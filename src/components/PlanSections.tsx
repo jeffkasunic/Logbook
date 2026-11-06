@@ -1,6 +1,6 @@
-// Planning sections shown on the Edit tab: core focus, projects, year goals and the reading list.
+// Planning sections shown on the Edit tab: core focus, projects and the reading list.
 import { Fragment, useState } from 'react';
-import type { Category, GoalArea, PlanSection, Project, ReadingCategory, ReadingItem } from '../types';
+import type { Category, PlanSection, Project, ReadingCategory, ReadingItem } from '../types';
 import { seriesVar } from '../lib/colors';
 import { setNote, type TextNotes } from '../lib/notes';
 import { mergeSubset } from '../lib/useDragReorder';
@@ -197,123 +197,6 @@ export function Projects({
           )}
         </div>
       )}
-    </div>
-  );
-}
-
-export function YearGoals({ areas, onChange }: { areas: GoalArea[]; onChange: (a: GoalArea[]) => void }) {
-  const setArea = (i: number, a: GoalArea | null) =>
-    onChange(a ? areas.map((x, j) => (j === i ? a : x)) : areas.filter((_, j) => j !== i));
-  return (
-    <div className="goals">
-      {areas.length === 0 && <p className="muted">No yearly goals on this quarter. Add an area, like “Writing”, then what it means this year.</p>}
-      <SortableList
-        className="goal-list"
-        items={areas}
-        onReorder={onChange}
-        itemKey={(a, i) => `${i}-${a.title}`}
-        itemLabel={(a) => a.title}
-        itemClass={() => 'goal-area'}
-        renderItem={(a, i) => (
-          <div className="goal-area-body">
-            <div className="goal-area-head">
-              <input
-                className="line-input goal-title"
-                defaultValue={a.title}
-                aria-label="Goal area"
-                onBlur={(e) => {
-                  const v = e.target.value.trim();
-                  if (!v && a.items.length === 0) setArea(i, null);
-                  else if (v && v !== a.title) setArea(i, { ...a, title: v });
-                }}
-              />
-              <button
-                type="button"
-                className="btn btn-icon btn-quiet"
-                aria-label={`Remove ${a.title}`}
-                onClick={() => {
-                  if (a.items.length && !confirm(`Remove “${a.title}” and its ${a.items.length} goal${a.items.length === 1 ? '' : 's'}?`)) return;
-                  setArea(i, null);
-                }}
-              >
-                ×
-              </button>
-            </div>
-            <SortableList
-              className="lines custom-items"
-              items={a.items}
-              onReorder={(items) => setArea(i, { ...a, items })}
-              itemKey={(it, k) => `${k}-${it}`}
-              itemLabel={(it) => it}
-              itemClass={(it) => (a.indented?.includes(it) ? 'is-indented' : undefined)}
-              renderItem={(it, k) => (
-                <>
-                  <div className="custom-item-text">
-                    <input
-                      className="line-input"
-                      defaultValue={it}
-                      aria-label={`${a.title} goal`}
-                      onBlur={(e) => {
-                        const v = e.target.value.trim();
-                        if (v === it) return;
-                        // Carry the Plan tab's check mark, the indent and the note over to the renamed item, or drop them with a removed one.
-                        const carry = (list?: string[]) => (list?.includes(it) ? [...list.filter((x) => x !== it), ...(v ? [v] : [])] : list);
-                        const notes = setNote(a.notes, it, '');
-                        setArea(i, {
-                          ...a,
-                          items: v ? a.items.map((x, j) => (j === k ? v : x)) : a.items.filter((_, j) => j !== k),
-                          done: carry(a.done),
-                          indented: carry(a.indented),
-                          notes: v ? setNote(notes, v, a.notes?.[it] ?? '') : notes,
-                        });
-                      }}
-                    />
-                    <input
-                      className="line-input custom-item-note"
-                      defaultValue={a.notes?.[it] ?? ''}
-                      placeholder="Note"
-                      aria-label={`Note on ${it}`}
-                      onBlur={(e) => {
-                        const v = e.target.value.trim();
-                        if (v !== (a.notes?.[it] ?? '')) setArea(i, { ...a, notes: setNote(a.notes, it, v) });
-                      }}
-                    />
-                  </div>
-                  <button
-                    type="button"
-                    className="btn btn-icon btn-quiet"
-                    aria-label={a.indented?.includes(it) ? `Outdent “${it}”` : `Indent “${it}”`}
-                    title={a.indented?.includes(it) ? 'Outdent' : 'Indent'}
-                    aria-pressed={!!a.indented?.includes(it)}
-                    onClick={() => {
-                      const indented = a.indented?.includes(it) ? a.indented.filter((x) => x !== it) : [...(a.indented ?? []), it];
-                      setArea(i, { ...a, indented: indented.length ? indented : undefined });
-                    }}
-                  >
-                    {a.indented?.includes(it) ? '←' : '→'}
-                  </button>
-                  <button
-                    type="button"
-                    className="btn btn-icon btn-quiet"
-                    aria-label={`Remove “${it}”`}
-                    onClick={() =>
-                      setArea(i, { ...a, items: a.items.filter((_, j) => j !== k), done: a.done?.filter((x) => x !== it), indented: a.indented?.filter((x) => x !== it), notes: setNote(a.notes, it, '') })
-                    }
-                  >
-                    ×
-                  </button>
-                </>
-              )}
-              after={
-                <li className="sortable-add">
-                  <AddInput placeholder={`Add to ${a.title}`} onAdd={(v) => setArea(i, { ...a, items: [...a.items, v] })} />
-                </li>
-              }
-            />
-          </div>
-        )}
-      />
-      <AddInput placeholder="Add a goal area" onAdd={(title) => onChange([...areas, { title, items: [] }])} />
     </div>
   );
 }

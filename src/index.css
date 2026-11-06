@@ -1400,7 +1400,6 @@ div.plan-item {
 }
 
 /* ------------------------------------------------------------------ planning sections (on the setup tab) */
-.copy-goals { margin-top: 0.5rem; }
 .line-input {
   width: 100%;
   min-width: 0;
@@ -1530,19 +1529,6 @@ div.plan-item {
 .custom-items li:focus-within .custom-item-note:placeholder-shown {
   height: 22px;
   opacity: 1;
-}
-.goal-area {
-  margin-bottom: 0.9rem;
-}
-.goal-title {
-  font-weight: 600;
-  font-family: var(--font-cond);
-  font-size: 1.02rem;
-}
-.goal-area .lines {
-  margin-left: 1rem;
-  padding-left: 0.5rem;
-  border-left: 2px solid var(--rule);
 }
 .reading {
   list-style: none;
@@ -1739,8 +1725,7 @@ div.plan-item {
   display: block;
   padding-left: 1.4rem;
 }
-.reading.sortable > li > .grip,
-.goal-list > li > .grip {
+.reading.sortable > li > .grip {
   align-self: flex-start;
   margin-top: 0.6rem;
 }
@@ -1763,15 +1748,6 @@ div.plan-item {
 .reading-cat-head .line-input {
   height: 30px;
   margin: 0;
-}
-.goal-area-head {
-  display: flex;
-  align-items: center;
-  gap: 0.2rem;
-}
-.goal-area-body {
-  flex: 1;
-  min-width: 0;
 }
 .setup-table tr.drop-before td {
   box-shadow: inset 0 2px 0 var(--accent);

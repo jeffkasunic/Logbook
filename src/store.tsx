@@ -34,7 +34,6 @@ export function blankQuarter(date: string): Quarter {
     metrics: [],
     days: {},
     core: [],
-    yearGoals: [],
     projects: [],
     reading: [],
   };

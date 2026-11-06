@@ -46,10 +46,6 @@ function baseQuarter(date: string): Quarter {
     { id: 'sleep', name: 'Sleep score', min: 0, max: 100 },
     { id: 'water', name: 'Water (cups)', min: 0, max: null },
   ];
-  q.yearGoals = [
-    { title: 'Writing', items: ['Write synopsis', 'Write 50,000 words'], done: [] },
-    { title: 'Health', items: ['Run a 10K', 'Sleep 7+ hours most nights'], done: [] },
-  ];
   return q;
 }
 

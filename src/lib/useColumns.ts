@@ -24,13 +24,16 @@ export function useColumnCount<T extends HTMLElement>(minWidth: number) {
 /**
  * Lay `ids` out in `count` columns, following `saved` where it can. Saved columns past `count`
  * fold onto the ones that fit, ids it doesn't know are dropped, and ids it doesn't list go in
- * the column with the fewest panels.
+ * the column with the fewest panels. When a saved column's panels have all gone (say, a retired
+ * panel), that column is dropped and the panels are spread evenly across the columns, keeping
+ * their order, so no gap is left. A column the user emptied by dragging is kept.
  */
 export function arrangeColumns(saved: string[][] | undefined, ids: string[], count: number): string[][] {
   const cols = Array.from({ length: count }, (): string[] => []);
   const known = new Set(ids);
   const placed = new Set<string>();
-  (saved ?? []).forEach((col, j) =>
+  const live = (saved ?? []).filter((col) => col.length === 0 || col.some((id) => known.has(id)));
+  live.forEach((col, j) =>
     col.forEach((id) => {
       if (!known.has(id) || placed.has(id)) return;
       cols[j % count].push(id);
@@ -41,5 +44,16 @@ export function arrangeColumns(saved: string[][] | undefined, ids: string[], cou
     if (placed.has(id)) continue;
     cols.reduce((a, b) => (b.length < a.length ? b : a)).push(id);
   }
-  return cols;
+  return live.length < (saved?.length ?? 0) ? spread(cols.flat(), count) : cols;
+}
+
+/** `ids` in order across `count` columns, as evenly as they go, with any extras in the leftmost columns. */
+function spread(ids: string[], count: number): string[][] {
+  const per = Math.floor(ids.length / count);
+  const extra = ids.length % count;
+  let at = 0;
+  return Array.from({ length: count }, (_, j) => {
+    const n = per + (j < extra ? 1 : 0);
+    return ids.slice(at, (at += n));
+  });
 }

@@ -9,7 +9,7 @@ import { useDragColumns } from '../lib/useDragReorder';
 import { Linkify } from './Linkify';
 import { Grip } from './Sortable';
 
-/** The quarter's core focus across the top, then its year goals, projects, reading list and the user's own sections as checklists, in columns the user arranges by dragging. Edit the lists themselves on the Edit tab. */
+/** The quarter's core focus across the top, then its projects, reading list and the user's own sections as checklists, in columns the user arranges by dragging. Edit the lists themselves on the Edit tab. */
 export function PlanView({ onEdit, onOpenProject }: { onEdit: () => void; onOpenProject: (id: string) => void }) {
   const { state, quarter: q, dispatch } = useStore();
   const patch = (p: Partial<Omit<Quarter, 'id'>>) => dispatch({ type: 'updateQuarter', quarterId: q.id, patch: p });
@@ -23,19 +23,8 @@ export function PlanView({ onEdit, onOpenProject }: { onEdit: () => void; onOpen
     { key: 'unsorted', title: 'Unsorted', books: q.reading.filter((r) => !r.kind || !knownReading.has(r.kind)) },
   ];
 
-  const goalsTotal = q.yearGoals.reduce((a, g) => a + g.items.length, 0);
-  const goalsDone = q.yearGoals.reduce((a, g) => a + g.items.filter((it) => g.done?.includes(it)).length, 0);
-
   const toggleProject = (id: string, done: boolean) => patch({ projects: q.projects.map((p) => (p.id === id ? { ...p, done } : p)) });
-  const toggleGoal = (area: number, item: string, done: boolean) =>
-    patch({
-      yearGoals: q.yearGoals.map((g, i) =>
-        i !== area ? g : { ...g, done: done ? [...(g.done ?? []), item] : (g.done ?? []).filter((x) => x !== item) },
-      ),
-    });
   const setProjectNote = (id: string, note: string) => patch({ projects: q.projects.map((p) => (p.id === id ? { ...p, note: note || undefined } : p)) });
-  const setGoalItemNote = (area: number, item: string, note: string) =>
-    patch({ yearGoals: q.yearGoals.map((g, i) => (i !== area ? g : { ...g, notes: setNote(g.notes, item, note) })) });
   const toggleItem = (sectionId: string, itemId: string, done: boolean) =>
     patch({
       sections: q.sections?.map((sec) => (sec.id !== sectionId ? sec : { ...sec, items: sec.items.map((it) => (it.id === itemId ? { ...it, done } : it)) })),
@@ -48,12 +37,6 @@ export function PlanView({ onEdit, onOpenProject }: { onEdit: () => void; onOpen
   const stepBook = (id: string) => patch({ reading: q.reading.map((r) => (r.id === id ? { ...r, status: NEXT_STATUS[r.status] } : r)) });
 
   const removeProject = (p: Project) => confirmRemoveProject(state, q.id, p) && patch({ projects: q.projects.filter((x) => x.id !== p.id) });
-  const removeGoal = (area: number, k: number, item: string) =>
-    patch({
-      yearGoals: q.yearGoals.map((g, i) =>
-        i !== area ? g : { ...g, items: g.items.filter((_, j) => j !== k), done: g.done?.filter((x) => x !== item), indented: g.indented?.filter((x) => x !== item), notes: setNote(g.notes, item, '') },
-      ),
-    });
   const removeItem = (sectionId: string, itemId: string) =>
     patch({ sections: q.sections?.map((sec) => (sec.id !== sectionId ? sec : { ...sec, items: sec.items.filter((it) => it.id !== itemId) })) });
   const removeBook = (id: string) => patch({ reading: q.reading.filter((r) => r.id !== id) });
@@ -61,37 +44,10 @@ export function PlanView({ onEdit, onOpenProject }: { onEdit: () => void; onOpen
 
   const panels: { id: string; label: string; render: (box: PanelBox, grip: ReactNode) => ReactNode }[] = [
     {
-      id: 'goals',
-      label: `${q.year} goals`,
-      render: (box, grip) => (
-        <PlanPanel box={box} grip={grip} title={`${q.year} goals`} done={goalsDone} total={goalsTotal} empty="No year goals yet." onEdit={onEdit}>
-          {q.yearGoals.map(
-            (g, i) =>
-              g.items.length > 0 && (
-                <PlanGroup key={`${i}-${g.title}`} title={g.title}>
-                  {g.items.map((it, k) => (
-                    <CheckItem
-                      key={`${k}-${it}`}
-                      label={it}
-                      note={g.notes?.[it]}
-                      checked={!!g.done?.includes(it)}
-                      indent={g.indented?.includes(it)}
-                      onChange={(v) => toggleGoal(i, it, v)}
-                      onNoteChange={(n) => setGoalItemNote(i, it, n)}
-                      onRemove={() => removeGoal(i, k, it)}
-                    />
-                  ))}
-                </PlanGroup>
-              ),
-          )}
-        </PlanPanel>
-      ),
-    },
-    {
       id: 'projects',
-      label: `${q.id.replace('-', ' ')} projects`,
+      label: `${q.year} projects`,
       render: (box, grip) => (
-        <PlanPanel box={box} grip={grip} title={`${q.id.replace('-', ' ')} projects`} done={q.projects.filter((p) => p.done).length} total={q.projects.length} empty="No projects yet." onEdit={onEdit}>
+        <PlanPanel box={box} grip={grip} title={`${q.year} projects`} done={q.projects.filter((p) => p.done).length} total={q.projects.length} empty="No projects yet." onEdit={onEdit}>
           {projectGroups.map((g) => (
             <PlanGroup key={g.key} title={g.title} color={g.color}>
               {g.items.map((p) => (

@@ -8,7 +8,7 @@ import { useDragReorder } from '../lib/useDragReorder';
 import { useMasonry } from '../lib/useMasonry';
 import { readingCategories } from '../lib/reading';
 import { confirmRemoveProject } from '../lib/projects';
-import { CustomSections, Projects, Reading, TextLines, YearGoals } from './PlanSections';
+import { CustomSections, Projects, Reading, TextLines } from './PlanSections';
 
 const slug = (s: string) =>
   s
@@ -23,16 +23,13 @@ function uniqueId(base: string, taken: string[]) {
   return id;
 }
 
-/** The Edit tab: what the daily log tracks (categories, measures) and what the Plan tab shows (focus, goals, projects, reading). Quarters and backups are on Settings. */
+/** The Edit tab: what the daily log tracks (categories, measures) and what the Plan tab shows (focus, projects, reading). Quarters and backups are on Settings. */
 export function SetupView() {
   const { state, quarter: q, dispatch } = useStore();
 
   const setCats = (categories: Category[]) => dispatch({ type: 'updateQuarter', quarterId: q.id, patch: { categories } });
   const setMetrics = (metrics: Metric[]) => dispatch({ type: 'updateQuarter', quarterId: q.id, patch: { metrics } });
   const patch = (p: Partial<Omit<Quarter, 'id'>>) => dispatch({ type: 'updateQuarter', quarterId: q.id, patch: p });
-  const prevGoals = state.quarters
-    .filter((x) => x.year === q.year && x.startDate < q.startDate && x.yearGoals.length > 0)
-    .sort((a, b) => b.startDate.localeCompare(a.startDate))[0];
 
   const catDrag = useDragReorder(q.categories, setCats);
   const metricDrag = useDragReorder(q.metrics, setMetrics);
@@ -246,19 +243,9 @@ export function SetupView() {
             <TextLines lines={q.core} notes={q.coreNotes} onChange={(core, coreNotes) => patch({ core, coreNotes })} placeholder="Add a core focus" />
           </section>
 
-          <section className="panel setup-wide">
-            <h2>{q.year} goals</h2>
-            <YearGoals areas={q.yearGoals} onChange={(yearGoals) => patch({ yearGoals })} />
-            {q.yearGoals.length === 0 && prevGoals && (
-              <button type="button" className="btn btn-sm copy-goals" onClick={() => patch({ yearGoals: structuredClone(prevGoals.yearGoals) })}>
-                Copy {q.year} goals from Q{prevGoals.quarter}
-              </button>
-            )}
-          </section>
-
           <section className="panel">
             <h2>
-              {q.id.replace('-', ' ')} projects
+              {q.year} projects
               <span className="count">
                 {q.projects.filter((p) => p.done).length}/{q.projects.length} done
               </span>
