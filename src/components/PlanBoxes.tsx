@@ -83,7 +83,7 @@ export function PlanBoxes({ onEdit }: { onEdit: () => void }) {
     });
   const removeItem = (sectionId: string, itemId: string) =>
     patch({ sections: q.sections?.map((sec) => (sec.id !== sectionId ? sec : { ...sec, items: sec.items.filter((it) => it.id !== itemId) })) });
-  const [grid, colCount] = useColumnCount<HTMLDivElement>(300);
+  const [grid, colCount] = useColumnCount<HTMLDivElement>(600);
 
   const panels: { id: string; label: string; render: (box: PanelBox, grip: ReactNode) => ReactNode }[] = (q.sections ?? []).map((sec) => ({
       id: sec.id,
